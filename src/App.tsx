@@ -291,7 +291,7 @@ const TOUR: { title: string; body: string; state: TourState }[] = [
   },
   {
     title: 'The buyer\'s artifact',
-    body: 'Headline: +3.2 ±0.6 pts/wk — rate, not level. Deflection definition locked at trial start. Timeline lifts link back to source clusters. ROI projected from current slope.',
+    body: 'Headline: +5.3 ±0.3 pts/wk — rate, not level. Deflection definition locked at trial start. Timeline lifts link back to source clusters. ROI projected from current level vs. baseline.',
     state: { tab: 'scorecard', trialDay: 21, selected: 'c1', annotated: false },
   },
   {

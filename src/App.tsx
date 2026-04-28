@@ -4,13 +4,14 @@
 // Volume / containment / deflection numbers are illustrative for the prototype.
 // Source: https://huggingface.co/datasets/strova-ai/customer_support_conversations_dataset
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import {
   BookOpen, Brain, Shield, Wrench, RotateCcw, Lock, Eye, EyeOff, Check,
-  Loader2, ChevronRight, Sparkles, ArrowUpRight, Inbox, AlertTriangle, Filter, Database,
+  Loader2, ChevronRight, ChevronLeft, Sparkles, ArrowUpRight, Inbox, AlertTriangle,
+  Filter, Database, Play, X,
 } from 'lucide-react';
 
 const DATASET_URL = 'https://huggingface.co/datasets/strova-ai/customer_support_conversations_dataset';
@@ -174,6 +175,40 @@ const ANNOTATIONS = {
     { n: 6, t: 'Projected ROI computed off current slope and locked baselines — the one number the buyer needs for the business case.' },
   ],
 };
+
+type TourState = { tab: 'workbench' | 'scorecard'; trialDay: number; selected: string; annotated: boolean };
+const TOUR: { title: string; body: string; state: TourState }[] = [
+  {
+    title: 'The Workbench',
+    body: 'Failure clusters are auto-ranked by leverage (volume × low-confidence × bad outcome). The top one is pre-selected — that\'s where you start each morning.',
+    state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
+  },
+  {
+    title: 'Steering signals, not just confirmation',
+    body: 'Each open cluster card shows a 7-day sparkline of its primary implicit signal. c3 (Order tracking) is trending up — getting worse fast — which is why it earns a top spot in the queue.',
+    state: { tab: 'workbench', trialDay: 7, selected: 'c3', annotated: false },
+  },
+  {
+    title: 'Diagnose → propose → ship',
+    body: 'On the right: representative transcripts, an auto-detected gap, and a recommended action with projected lift as a range (80% CI), routed to the right internal owner. One click to apply.',
+    state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
+  },
+  {
+    title: 'Time-shift to Day 21',
+    body: 'Four fixes have shipped. Each shipped cluster carries a measured before/after band with a confidence badge tied to sample size (high · medium · low).',
+    state: { tab: 'workbench', trialDay: 21, selected: 'c1', annotated: false },
+  },
+  {
+    title: 'The buyer\'s artifact',
+    body: 'Headline: +3.2 ±0.6 pts/wk slope — rate, not level. Definition of "deflection" was locked at trial start. Each timeline lift links back to the cluster that produced it. ROI is computed off the current slope.',
+    state: { tab: 'scorecard', trialDay: 21, selected: 'c1', annotated: false },
+  },
+  {
+    title: 'Read the thesis callouts',
+    body: 'Annotations are now on. 14 numbered callouts tie individual UI elements back to specific arguments in the case study — 8 on the Workbench, 6 on the Scorecard. Toggle any time from the header.',
+    state: { tab: 'workbench', trialDay: 21, selected: 'c1', annotated: true },
+  },
+];
 
 /* ============================== HELPERS ============================== */
 
@@ -490,8 +525,7 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
   );
 }
 
-function Workbench({ trialDay, annotated }: { trialDay: number; annotated: boolean }) {
-  const [selected, setSelected] = useState('c1');
+function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: number; annotated: boolean; selected: string; setSelected: (id: string) => void }) {
   const [whyFilter, setWhyFilter] = useState<string>('all');
   const [shipped, setShipped] = useState<Record<string, boolean>>({});
   const [applying, setApplying] = useState<string | null>(null);
@@ -679,15 +713,108 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
   );
 }
 
+/* ============================== ONBOARDING ============================== */
+
+function WelcomeModal({ onTour, onClose }: { onTour: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-7" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7 h-7 rounded-md bg-slate-900 grid place-items-center text-white text-xs font-bold">D</div>
+          <Pill className="text-slate-600 bg-slate-100 border-slate-200">Case-study prototype</Pill>
+        </div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-2 leading-tight">Decagon Hillclimbing — Acme Apparel trial, Day 7</h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-4">
+          You're an Acme Apparel ops lead working through customer-support failure clusters with your Decagon CSM. The thesis: trials are won on <span className="font-semibold text-slate-900">slope</span> of improvement, not level — so the product is built around a tight find → fix → validate loop.
+        </p>
+        <div className="space-y-1.5 mb-5 text-sm">
+          <div className="flex items-baseline gap-3"><span className="font-semibold text-slate-900 w-24 shrink-0">Workbench</span><span className="text-slate-600">the daily driver — ranked clusters, drill in, ship a fix, watch validation.</span></div>
+          <div className="flex items-baseline gap-3"><span className="font-semibold text-slate-900 w-24 shrink-0">Scorecard</span><span className="text-slate-600">the buyer's artifact — slope chart, attributed timeline, projected ROI.</span></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={onTour} className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-md transition">
+            <Play className="w-4 h-4" />Start the 60-second tour
+          </button>
+          <button onClick={onClose} className="text-sm font-medium text-slate-600 hover:text-slate-900">Just let me explore</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TourCard({ step, onPrev, onNext, onClose }: { step: number; onPrev: () => void; onNext: () => void; onClose: () => void }) {
+  const s = TOUR[step];
+  const total = TOUR.length;
+  const isLast = step === total - 1;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(560px,calc(100vw-2rem))]">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-2xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+            <Play className="w-3 h-3" />Tour · step {step + 1} of {total}
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="font-semibold text-slate-900 text-sm mb-1">{s.title}</div>
+        <p className="text-sm text-slate-600 leading-relaxed mb-3">{s.body}</p>
+        <div className="flex items-center justify-between">
+          <button onClick={onClose} className="text-xs font-medium text-slate-500 hover:text-slate-900 transition">End tour</button>
+          <div className="flex gap-2">
+            <button disabled={step === 0} onClick={onPrev} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+              <ChevronLeft className="w-3.5 h-3.5" />Previous
+            </button>
+            <button onClick={onNext} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white transition">
+              {isLast ? 'Finish' : 'Next'}<ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 h-0.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-slate-900 transition-all" style={{ width: `${((step + 1) / total) * 100}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================== APP SHELL ============================== */
 
 export default function App() {
   const [tab, setTab] = useState<'workbench' | 'scorecard'>('workbench');
   const [trialDay, setTrialDay] = useState<number>(7);
   const [annotated, setAnnotated] = useState(false);
+  const [selected, setSelected] = useState<string>('c1');
+  const [tourStep, setTourStep] = useState<number | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!localStorage.getItem('hillclimbing.welcomed')) setShowWelcome(true);
+  }, []);
+
+  const applyStep = (idx: number) => {
+    const s = TOUR[idx].state;
+    setTab(s.tab);
+    setTrialDay(s.trialDay);
+    setSelected(s.selected);
+    setAnnotated(s.annotated);
+  };
+  const dismissWelcome = () => {
+    if (typeof window !== 'undefined') localStorage.setItem('hillclimbing.welcomed', '1');
+    setShowWelcome(false);
+  };
+  const startTour = () => { dismissWelcome(); setTourStep(0); applyStep(0); };
+  const nextStep = () => {
+    if (tourStep === null) return;
+    if (tourStep >= TOUR.length - 1) { setTourStep(null); return; }
+    const n = tourStep + 1; setTourStep(n); applyStep(n);
+  };
+  const prevStep = () => {
+    if (tourStep === null || tourStep === 0) return;
+    const p = tourStep - 1; setTourStep(p); applyStep(p);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
       <header className="border-b border-slate-200 bg-white sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
           <div className="flex items-center gap-2">
@@ -703,6 +830,9 @@ export default function App() {
             <TabButton active={tab === 'scorecard'} onClick={() => setTab('scorecard')}>Scorecard</TabButton>
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <button onClick={startTour} className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition">
+              <Play className="w-3 h-3" />Take tour
+            </button>
             <div className="flex items-center bg-slate-100 rounded-md p-0.5 text-xs">
               {[7, 21].map((d) => (
                 <button key={d} onClick={() => setTrialDay(d)} className={`px-2.5 py-1 rounded transition ${trialDay === d ? 'bg-white shadow-sm font-semibold text-slate-900' : 'text-slate-600'}`}>
@@ -718,9 +848,24 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`max-w-7xl mx-auto px-6 py-6 transition-all ${annotated ? 'pr-[340px]' : ''}`}>
-        {tab === 'workbench' ? <Workbench trialDay={trialDay} annotated={annotated} /> : <Scorecard trialDay={trialDay} annotated={annotated} />}
+      <main className={`max-w-7xl mx-auto w-full px-6 py-6 transition-all flex-1 ${annotated ? 'pr-[340px]' : ''}`}>
+        {tab === 'workbench'
+          ? <Workbench trialDay={trialDay} annotated={annotated} selected={selected} setSelected={setSelected} />
+          : <Scorecard trialDay={trialDay} annotated={annotated} />}
       </main>
+
+      <footer className={`border-t border-slate-200 bg-white transition-all ${annotated ? 'pr-[320px]' : ''}`}>
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between text-xs text-slate-500">
+          <div>
+            Made by{' '}
+            <a href="https://vivfeng.github.io/portfolio/#projects" target="_blank" rel="noreferrer" className="font-semibold text-slate-700 hover:text-blue-700 transition">
+              Vivian Feng
+            </a>
+            {' '}for the Decagon case study.
+          </div>
+          <a href="https://github.com/vivfeng/hillclimbing" target="_blank" rel="noreferrer" className="hover:text-slate-700 transition">source ↗</a>
+        </div>
+      </footer>
 
       {annotated && (
         <aside className="fixed top-14 right-0 bottom-0 w-[320px] border-l border-slate-200 bg-white p-5 overflow-y-auto z-10">
@@ -737,6 +882,9 @@ export default function App() {
           </ol>
         </aside>
       )}
+
+      {showWelcome && <WelcomeModal onTour={startTour} onClose={dismissWelcome} />}
+      {tourStep !== null && <TourCard step={tourStep} onPrev={prevStep} onNext={nextStep} onClose={() => setTourStep(null)} />}
     </div>
   );
 }

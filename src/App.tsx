@@ -27,8 +27,10 @@ const WHY = {
 const CLUSTERS = [
   {
     id: 'c1', name: 'Extended return window confusion', intent: 'Refunds', why: 'knowledge',
-    volumePerDay: 142, containment: 71, deflection: 44, csatDrag: -0.31, projectedLift: 4.2,
+    volumePerDay: 142, containment: 71, deflection: 44, csatDrag: -0.31,
+    projectedLift: 4.2, projectedLiftRange: [3.5, 4.8] as [number, number],
     confidence: 0.34, source: 'imported',
+    primarySignal: { label: 'rephrase rate', trend7d: [16, 17, 18, 20, 21, 23, 25] },
     gap: '"I don\'t have information about extended return windows" + 14 paraphrases — 89 conversations / wk',
     transcripts: [
       { u: 'I bought a sweater on Black Friday and need to return it. Site says holiday returns go through Jan 31?', a: "I don't have specific information about extended holiday return windows. Standard returns are 30 days. Would you like to be transferred?" },
@@ -42,8 +44,10 @@ const CLUSTERS = [
   },
   {
     id: 'c2', name: 'Promo code stacking error', intent: 'Promotions', why: 'reasoning',
-    volumePerDay: 98, containment: 64, deflection: 31, csatDrag: -0.42, projectedLift: 3.1,
+    volumePerDay: 98, containment: 64, deflection: 31, csatDrag: -0.42,
+    projectedLift: 3.1, projectedLiftRange: [2.4, 3.8] as [number, number],
     confidence: 0.41, source: 'imported',
+    primarySignal: { label: 'mid-flow escalation', trend7d: [22, 22, 24, 25, 26, 28, 31] },
     gap: 'Agent applies non-stackable codes then silently reverses one — 61 conversations / wk',
     transcripts: [
       { u: 'I have SPRING20 and FRIENDS15 — can I use both?', a: 'Yes, both are valid. Applying… Actually, FRIENDS15 was removed. Your total is now $84.99.' },
@@ -56,8 +60,10 @@ const CLUSTERS = [
   },
   {
     id: 'c3', name: 'Order tracking lookup timeout', intent: 'Order status', why: 'tool',
-    volumePerDay: 124, containment: 58, deflection: 22, csatDrag: -0.55, projectedLift: 5.1,
+    volumePerDay: 124, containment: 58, deflection: 22, csatDrag: -0.55,
+    projectedLift: 5.1, projectedLiftRange: [4.2, 6.1] as [number, number],
     confidence: 0.28, source: 'native',
+    primarySignal: { label: 'escalation rate', trend7d: [58, 60, 63, 67, 70, 71, 73] },
     gap: 'Carrier API times out at 8s; agent escalates 73% of timeout cases — 91 conversations / wk',
     transcripts: [
       { u: "Where's my order #4471892?", a: "I'm having trouble looking that up right now. Let me connect you with someone who can help." },
@@ -70,8 +76,10 @@ const CLUSTERS = [
   },
   {
     id: 'c4', name: 'Subscription pause not honored', intent: 'Subscriptions', why: 'policy',
-    volumePerDay: 67, containment: 52, deflection: 28, csatDrag: -0.61, projectedLift: 2.4,
+    volumePerDay: 67, containment: 52, deflection: 28, csatDrag: -0.61,
+    projectedLift: 2.4, projectedLiftRange: [1.8, 3.0] as [number, number],
     confidence: 0.39, source: 'native',
+    primarySignal: { label: '48h repeat', trend7d: [38, 40, 41, 43, 45, 46, 49] },
     gap: 'Pause requested mid-cycle still ships next box — policy ambiguous on cutoff — 48 conv / wk',
     transcripts: [
       { u: 'I paused my subscription last week and got charged again this morning?', a: 'Pauses take effect at the next billing cycle. Your charge was already processed.' },
@@ -83,8 +91,10 @@ const CLUSTERS = [
   },
   {
     id: 'c5', name: 'Address change after carrier handoff', intent: 'Shipping', why: 'policy',
-    volumePerDay: 54, containment: 49, deflection: 19, csatDrag: -0.48, projectedLift: 1.8,
+    volumePerDay: 54, containment: 49, deflection: 19, csatDrag: -0.48,
+    projectedLift: 1.8, projectedLiftRange: [1.3, 2.4] as [number, number],
     confidence: 0.43, source: 'native',
+    primarySignal: { label: '48h repeat', trend7d: [22, 24, 24, 25, 27, 28, 29] },
     gap: 'Agents promise address changes after pickup — operationally impossible — 36 conv / wk',
     transcripts: [
       { u: 'I need to change the delivery address on order 4468121', a: "I can update that for you. What's the new address?" },
@@ -96,8 +106,10 @@ const CLUSTERS = [
   },
   {
     id: 'c6', name: 'Loyalty points expiration unclear', intent: 'Account', why: 'knowledge',
-    volumePerDay: 41, containment: 76, deflection: 51, csatDrag: -0.18, projectedLift: 0.8,
+    volumePerDay: 41, containment: 76, deflection: 51, csatDrag: -0.18,
+    projectedLift: 0.8, projectedLiftRange: [0.5, 1.1] as [number, number],
     confidence: 0.52, source: 'native',
+    primarySignal: { label: 'rephrase rate', trend7d: [12, 13, 12, 13, 14, 14, 15] },
     gap: 'Tier-specific expiration windows missing from KB — 27 conversations / wk',
     transcripts: [
       { u: 'When do my Gold tier points expire?', a: "Points generally expire 12 months after they're earned. I don't have tier-specific details." },
@@ -137,9 +149,9 @@ const TIMELINE = [
   { day: 19, clusterId: 'c6', name: 'Loyalty points expiration',         action: 'Added tier-specific expiration table',               deflectionLift: 0.8, intent: 'Account',     owner: 'Docs' },
 ] as const;
 
-const SNAPSHOT: Record<number, { deflection: number; containment: number; csat: number; slopePerWeek: number; monthlyVolume: number; costPerTicket: number }> = {
-  7:  { deflection: 44.2, containment: 67.8, csat: 3.55, slopePerWeek: 0.9, monthlyVolume: 47200, costPerTicket: 8.50 },
-  21: { deflection: 58.4, containment: 73.9, csat: 3.92, slopePerWeek: 3.2, monthlyVolume: 47200, costPerTicket: 8.50 },
+const SNAPSHOT: Record<number, { deflection: number; containment: number; csat: number; slopePerWeek: number; slopeCI: number; monthlyVolume: number; costPerTicket: number }> = {
+  7:  { deflection: 44.2, containment: 67.8, csat: 3.55, slopePerWeek: 0.9, slopeCI: 1.1, monthlyVolume: 47200, costPerTicket: 8.50 },
+  21: { deflection: 58.4, containment: 73.9, csat: 3.92, slopePerWeek: 3.2, slopeCI: 0.6, monthlyVolume: 47200, costPerTicket: 8.50 },
 };
 
 const ANNOTATIONS = {
@@ -205,6 +217,45 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
+function Sparkline({ data, w = 56, h = 16 }: { data: number[]; w?: number; h?: number }) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ');
+  const last = data[data.length - 1];
+  const first = data[0];
+  const dir = last > first ? 'up' : last < first ? 'down' : 'flat';
+  // For implicit signals (rephrase / escalation / repeat), up == worse → rose
+  const stroke = dir === 'up' ? '#e11d48' : dir === 'down' ? '#059669' : '#64748b';
+  const lastY = h - ((last - min) / range) * h;
+  return (
+    <svg width={w} height={h} className="overflow-visible shrink-0" aria-hidden>
+      <polyline fill="none" stroke={stroke} strokeWidth={1.5} points={pts} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={w} cy={lastY} r={2} fill={stroke} />
+    </svg>
+  );
+}
+
+function trendDelta(trend7d: number[]) {
+  const first = trend7d[0];
+  const last = trend7d[trend7d.length - 1];
+  const dir = last > first ? 'up' : last < first ? 'down' : 'flat';
+  const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '→';
+  // up = worse → rose; down = better → emerald
+  const cls = dir === 'up' ? 'text-rose-700' : dir === 'down' ? 'text-emerald-700' : 'text-slate-500';
+  return { first, last, dir, arrow, cls };
+}
+
+function fmtRange([lo, hi]: [number, number]) {
+  return `+${lo}–${hi} pts`;
+}
+
+function confidenceLevel(n: number): { level: 'high' | 'medium' | 'low'; cls: string } {
+  if (n >= 40) return { level: 'high',   cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+  if (n >= 20) return { level: 'medium', cls: 'text-amber-700 bg-amber-50 border-amber-200' };
+  return        { level: 'low',    cls: 'text-slate-600 bg-slate-100 border-slate-200' };
+}
+
 /* ============================== WORKBENCH ============================== */
 
 type Cluster = typeof CLUSTERS[number];
@@ -248,9 +299,21 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
         </div>
         <div>
           <div className="text-slate-500">Proj. lift</div>
-          <div className="font-semibold tabular-nums text-emerald-700">+{c.projectedLift} pts</div>
+          <div className="font-semibold tabular-nums text-emerald-700">{fmtRange(c.projectedLiftRange)}</div>
         </div>
       </div>
+      {status === 'open' && c.primarySignal && (() => {
+        const t = trendDelta(c.primarySignal.trend7d);
+        return (
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
+            <Sparkline data={c.primarySignal.trend7d} />
+            <div className="text-[10px] leading-tight">
+              <div className={`font-semibold tabular-nums ${t.cls}`}>{t.arrow} {c.primarySignal.label} {t.last}%</div>
+              <div className="text-slate-500">7d trend · was {t.first}%</div>
+            </div>
+          </div>
+        );
+      })()}
     </button>
   );
 }
@@ -270,12 +333,15 @@ function ValidationBand({ validation, optimistic = false, badge }: { validation:
     { label: '48h repeat contact rate',         value: validation.repeatRate48h, suffix: '%', good: 'down' },
     { label: `Explicit CSAT survey (n=${validation.csat.n || '—'})`, value: validation.csat.delta, suffix: ' ★', good: 'up' },
   ];
+  const conf = confidenceLevel(optimistic ? 0 : (validation.csat.n || 0));
   return (
     <div className={`rounded-lg border ${optimistic ? 'border-dashed border-slate-300 bg-slate-50' : 'border-emerald-200 bg-emerald-50/40'} p-4`}>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 flex items-center">
-          {optimistic ? 'Projected — validating' : 'Measured — implicit signals + CSAT'}
-          {badge}
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 flex items-center gap-2">
+          <span className="flex items-center">{optimistic ? 'Projected — validating' : 'Measured — implicit signals + CSAT'}{badge}</span>
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${conf.cls} normal-case tracking-normal`}>
+            confidence: {conf.level}{!optimistic && ` · n=${validation.csat.n}`}
+          </span>
         </div>
         {optimistic && <span className="text-[10px] text-slate-500">first reading expected in ~4h</span>}
       </div>
@@ -392,7 +458,7 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
             <div className="flex-1">
               <div className="text-sm font-medium text-slate-900 mb-1">{c.action}</div>
               <div className="text-xs text-slate-600">
-                Routed to <span className="font-semibold text-slate-900">{c.owner}</span> · projected <span className="font-semibold text-emerald-700">+{c.projectedLift} pts deflection on {c.intent}</span>
+                Routed to <span className="font-semibold text-slate-900">{c.owner}</span> · projected <span className="font-semibold text-emerald-700">{fmtRange(c.projectedLiftRange)} deflection on {c.intent}</span> <span className="text-slate-400">(80% CI)</span>
               </div>
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0">
@@ -530,10 +596,15 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trial trajectory · day {trialDay} of 30</div>
             <div className="flex items-baseline gap-2 mt-1">
-              <div className="text-3xl font-bold text-emerald-700 tabular-nums flex items-center">+{snap.slopePerWeek} pts / wk{annotated && <NBadge n={1} />}</div>
-              <span className="text-sm font-medium text-slate-500">deflection</span>
+              <div className="text-3xl font-bold text-emerald-700 tabular-nums flex items-baseline gap-1.5">
+                +{snap.slopePerWeek}
+                <span className="text-lg font-semibold text-emerald-700/70">±{snap.slopeCI}</span>
+                <span className="text-base font-medium text-slate-500">pts / wk</span>
+                {annotated && <NBadge n={1} />}
+                <span className="text-base font-medium text-slate-500">deflection</span>
+              </div>
             </div>
-            <div className="text-xs text-slate-500 mt-1">Headline is rate of improvement, not level. Current deflection: {snap.deflection}% · containment: {snap.containment}%.</div>
+            <div className="text-xs text-slate-500 mt-1">Headline is rate of improvement, not level. 80% CI from {trialDay}-day rolling regression. Current deflection: {snap.deflection}% · containment: {snap.containment}%.</div>
           </div>
           <Pill className="text-slate-700 bg-slate-50 border-slate-200 shrink-0">
             <Lock className="w-3 h-3" />Deflection = no repeat contact within 5 days

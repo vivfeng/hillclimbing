@@ -11,7 +11,7 @@ import {
 import {
   BookOpen, Brain, Shield, Wrench, RotateCcw, Lock, Eye, EyeOff, Check,
   Loader2, ChevronRight, ChevronLeft, Sparkles, ArrowUpRight, Inbox, AlertTriangle,
-  Filter, Database, Play, X,
+  Filter, Database, Play, X, Clock, Send,
 } from 'lucide-react';
 
 const DATASET_URL = 'https://huggingface.co/datasets/strova-ai/customer_support_conversations_dataset';
@@ -40,7 +40,9 @@ const CLUSTERS = [
     ],
     action: 'Add extended-returns policy article to KB (covers holiday window + gift returns)',
     owner: 'Docs',
-    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 4,
+    actionType: 'direct' as const, actionVerb: 'Publish to KB',
+    actionMicro: 'Article publishes to the agent KB. Picked up on the next conversation. First validation reading in ~4h.',
+    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 4, routedDay: null,
     validation: { rephraseRate: -38, escalationRate: -42, repeatRate48h: -29, csat: { delta: 0.6, n: 47 } },
   },
   {
@@ -56,7 +58,9 @@ const CLUSTERS = [
     ],
     action: 'Add stacking-rules pre-check to agent prompt before quoting any total',
     owner: 'Agent Config',
-    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 6,
+    actionType: 'direct' as const, actionVerb: 'Deploy prompt change',
+    actionMicro: 'Prompt rolls out to 100% of Promotions traffic immediately. First validation reading in ~4h.',
+    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 6, routedDay: null,
     validation: { rephraseRate: -22, escalationRate: -31, repeatRate48h: -18, csat: { delta: 0.4, n: 32 } },
   },
   {
@@ -72,7 +76,9 @@ const CLUSTERS = [
     ],
     action: 'Raise carrier-API timeout to 15s + add cached-tracking fallback for last-known status',
     owner: 'Engineering',
-    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 12,
+    actionType: 'routed' as const, actionVerb: 'Send to Engineering',
+    actionMicro: 'Engineering reviews + ships the timeout/fallback. Validation appears here once it lands. Typical SLA: 3–5 days.',
+    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 12, routedDay: 8,
     validation: { rephraseRate: -8, escalationRate: -64, repeatRate48h: -41, csat: { delta: 0.7, n: 58 } },
   },
   {
@@ -88,7 +94,10 @@ const CLUSTERS = [
     ],
     action: 'Decision needed → Subscription PM: define pause cutoff window relative to ship date',
     owner: 'Policy (Subs PM)',
-    statusByDay: { 7: 'open', 21: 'open' }, shippedDay: null, validation: null,
+    actionType: 'routed' as const, actionVerb: 'Send to Subs PM',
+    actionMicro: 'Subs PM decides on cutoff window. You\'ll see status updates here. Typical SLA: 2 days for ack, ~1 week for resolution.',
+    statusByDay: { 7: 'routed', 21: 'routed' }, shippedDay: null, routedDay: 5,
+    validation: null,
   },
   {
     id: 'c5', name: 'Address change after carrier handoff', intent: 'Shipping', why: 'policy',
@@ -103,7 +112,10 @@ const CLUSTERS = [
     ],
     action: 'Update prompt: check shipment status before promising address change; escalate if shipped',
     owner: 'Agent Config',
-    statusByDay: { 7: 'open', 21: 'open' }, shippedDay: null, validation: null,
+    actionType: 'direct' as const, actionVerb: 'Deploy prompt change',
+    actionMicro: 'Prompt rolls out to 100% of Shipping traffic immediately. First validation reading in ~4h.',
+    statusByDay: { 7: 'open', 21: 'open' }, shippedDay: null, routedDay: null,
+    validation: null,
   },
   {
     id: 'c6', name: 'Loyalty points expiration unclear', intent: 'Account', why: 'knowledge',
@@ -117,7 +129,9 @@ const CLUSTERS = [
     ],
     action: 'Add tier-specific points-expiration table to KB',
     owner: 'Docs',
-    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 19,
+    actionType: 'direct' as const, actionVerb: 'Publish to KB',
+    actionMicro: 'Article publishes to the agent KB. Picked up on the next conversation. First validation reading in ~4h.',
+    statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 19, routedDay: null,
     validation: { rephraseRate: -19, escalationRate: -24, repeatRate48h: -16, csat: { delta: 0.3, n: 14 } },
   },
 ];
@@ -295,7 +309,7 @@ function confidenceLevel(n: number): { level: 'high' | 'medium' | 'low'; cls: st
 
 type Cluster = typeof CLUSTERS[number];
 
-function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; selected: boolean; onSelect: (id: string) => void; status: 'open' | 'shipped'; badges?: { containment?: number; source?: number } }) {
+function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; selected: boolean; onSelect: (id: string) => void; status: 'open' | 'routed' | 'shipped'; badges?: { containment?: number; source?: number } }) {
   const w = WHY[c.why as keyof typeof WHY];
   const Icon = w.icon;
   return (
@@ -319,6 +333,11 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
             <Check className="w-3 h-3" />shipped
           </span>
         )}
+        {status === 'routed' && (
+          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-600 bg-slate-100 border border-slate-200">
+            <Clock className="w-3 h-3" />awaiting {c.owner.split(' ')[0]}
+          </span>
+        )}
       </div>
       <div className="font-semibold text-sm text-slate-900 leading-snug">{c.name}</div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
@@ -337,7 +356,7 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
           <div className="font-semibold tabular-nums text-emerald-700">{fmtRange(c.projectedLiftRange)}</div>
         </div>
       </div>
-      {status === 'open' && c.primarySignal && (() => {
+      {status !== 'shipped' && c.primarySignal && (() => {
         const t = trendDelta(c.primarySignal.trend7d);
         return (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
@@ -407,12 +426,17 @@ function estimateValidation(c: Cluster) {
 }
 
 function LoadingDetail({ c }: { c: Cluster }) {
+  const direct = c.actionType === 'direct';
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
       <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
-      <div className="text-sm font-semibold text-slate-900">Shipping fix to production…</div>
-      <div className="text-xs text-slate-500 mt-1">Versioning edit · routing to {c.owner} · enabling for 100% of {c.intent} traffic</div>
-      <div className="text-xs text-slate-400 mt-3">Implicit-signal validation typically appears in 2–4 hours.</div>
+      <div className="text-sm font-semibold text-slate-900">{direct ? 'Shipping fix to production…' : `Routing to ${c.owner}…`}</div>
+      <div className="text-xs text-slate-500 mt-1">
+        {direct
+          ? `Versioning edit · enabling for 100% of ${c.intent} traffic`
+          : `Sending cluster context + recommended action · awaiting ack from ${c.owner}`}
+      </div>
+      <div className="text-xs text-slate-400 mt-3">{direct ? 'Implicit-signal validation typically appears in 2–4 hours.' : `Typical SLA: ${c.actionType === 'routed' ? '2–5 days for resolution.' : ''}`}</div>
     </div>
   );
 }
@@ -426,13 +450,17 @@ function EmptyDetail() {
   );
 }
 
-function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDay }: { c: Cluster; justShipped: boolean; onApply: (id: string) => void; onRollback: (id: string) => void; annotated: boolean; trialDay: number }) {
+function ClusterDetail({ c, status, justActed, onApply, onCancel, annotated, trialDay }: { c: Cluster; status: ClusterStatus; justActed: boolean; onApply: (id: string) => void; onCancel: (id: string) => void; annotated: boolean; trialDay: number }) {
   if (!c) return <EmptyDetail />;
   const w = WHY[c.why as keyof typeof WHY];
   const Icon = w.icon;
+  const isShipped = status === 'shipped';
+  const isRouted = status === 'routed';
+  const isOpen = status === 'open';
   const dayShipped = c.statusByDay[trialDay as 7 | 21] === 'shipped';
-  const isShipped = justShipped || dayShipped;
-  const validation = c.validation ?? (justShipped ? estimateValidation(c) : null);
+  const validation = c.validation ?? (isShipped && justActed ? estimateValidation(c) : null);
+  const direct = c.actionType === 'direct';
+  const ActionIcon = direct ? ChevronRight : Send;
 
   return (
     <div className="space-y-4">
@@ -493,21 +521,34 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
             <div className="flex-1">
               <div className="text-sm font-medium text-slate-900 mb-1">{c.action}</div>
               <div className="text-xs text-slate-600">
-                Routed to <span className="font-semibold text-slate-900">{c.owner}</span> · projected <span className="font-semibold text-emerald-700">{fmtRange(c.projectedLiftRange)} deflection on {c.intent}</span> <span className="text-slate-400">(80% CI)</span>
+                {direct ? 'Owned by' : 'Routes to'} <span className="font-semibold text-slate-900">{c.owner}</span> · projected <span className="font-semibold text-emerald-700">{fmtRange(c.projectedLiftRange)} deflection on {c.intent}</span> <span className="text-slate-400">(80% CI)</span>
               </div>
+              {isOpen && (
+                <div className="mt-2 text-xs text-slate-500 border-t border-blue-100 pt-2">{c.actionMicro}</div>
+              )}
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0">
-              {!isShipped && (
+              {isOpen && (
                 <button onClick={() => onApply(c.id)} className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-blue-700 transition">
-                  Apply fix <ChevronRight className="w-4 h-4" />
+                  {c.actionVerb} <ActionIcon className="w-4 h-4" />
                 </button>
+              )}
+              {isRouted && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-sm font-semibold px-3 py-1.5 rounded-md border border-slate-200">
+                    <Clock className="w-4 h-4" />Awaiting {c.owner.split(' ')[0]} · day {c.routedDay ?? trialDay}
+                  </span>
+                  <button onClick={() => onCancel(c.id)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-rose-600 transition">
+                    <X className="w-3 h-3" />cancel routing
+                  </button>
+                </>
               )}
               {isShipped && (
                 <>
                   <span className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-sm font-semibold px-3 py-1.5 rounded-md border border-emerald-200">
-                    <Check className="w-4 h-4" />Shipped {justShipped && !dayShipped ? 'just now' : `day ${c.shippedDay}`}
+                    <Check className="w-4 h-4" />Shipped {justActed && !dayShipped ? 'just now' : `day ${c.shippedDay}`}
                   </span>
-                  <button onClick={() => onRollback(c.id)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-rose-600 transition">
+                  <button onClick={() => onCancel(c.id)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-rose-600 transition">
                     <RotateCcw className="w-3 h-3" />rollback v{23 + (c.id.charCodeAt(1) % 9)}
                     {annotated && <NBadge n={8} />}
                   </button>
@@ -518,34 +559,58 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
         </div>
       </Section>
 
-      <Section title="Before / after" subtitle="implicit signals + CSAT confirmation">
-        <ValidationBand validation={validation} optimistic={justShipped && !c.validation} badge={annotated ? <NBadge n={7} /> : null} />
-      </Section>
+      {isRouted ? (
+        <Section title="Routing status" subtitle={`sent to ${c.owner} · awaiting decision`}>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-slate-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-slate-900">Sent day {c.routedDay ?? trialDay} · {c.owner} acked day {(c.routedDay ?? trialDay) + 1}</div>
+                <div className="text-xs text-slate-600 mt-1">{c.actionMicro}</div>
+                <div className="text-xs text-slate-500 mt-3 inline-flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  Validation band populates here automatically once the owner ships the change.
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+      ) : (
+        <Section title="Before / after" subtitle="implicit signals + CSAT confirmation">
+          <ValidationBand validation={validation} optimistic={isShipped && justActed && !c.validation} badge={annotated ? <NBadge n={7} /> : null} />
+        </Section>
+      )}
     </div>
   );
 }
 
+type ClusterStatus = 'open' | 'routed' | 'shipped';
+
 function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: number; annotated: boolean; selected: string; setSelected: (id: string) => void }) {
   const [whyFilter, setWhyFilter] = useState<string>('all');
-  const [shipped, setShipped] = useState<Record<string, boolean>>({});
+  const [actions, setActions] = useState<Record<string, 'shipped' | 'routed'>>({});
   const [applying, setApplying] = useState<string | null>(null);
 
   const visible = useMemo(() => CLUSTERS.filter((c) => whyFilter === 'all' || c.why === whyFilter), [whyFilter]);
-  const isShippedForView = (c: Cluster) => shipped[c.id] || c.statusByDay[trialDay as 7 | 21] === 'shipped';
-  const open = visible.filter((c) => !isShippedForView(c)).sort((a, b) => b.volumePerDay * (1 - b.confidence) - a.volumePerDay * (1 - a.confidence));
-  const shippedList = visible.filter(isShippedForView);
+  const getStatus = (c: Cluster): ClusterStatus => actions[c.id] ?? (c.statusByDay[trialDay as 7 | 21] as ClusterStatus);
+  const open      = visible.filter((c) => getStatus(c) === 'open').sort((a, b) => b.volumePerDay * (1 - b.confidence) - a.volumePerDay * (1 - a.confidence));
+  const inFlight  = visible.filter((c) => getStatus(c) === 'routed');
+  const shippedList = visible.filter((c) => getStatus(c) === 'shipped');
 
   const current = CLUSTERS.find((c) => c.id === selected) as Cluster;
 
   const apply = (id: string) => {
+    const c = CLUSTERS.find((x) => x.id === id);
+    if (!c) return;
+    const next: 'shipped' | 'routed' = c.actionType === 'direct' ? 'shipped' : 'routed';
     setApplying(id);
     setTimeout(() => {
-      setShipped((s) => ({ ...s, [id]: true }));
+      setActions((s) => ({ ...s, [id]: next }));
       setApplying(null);
-    }, 1300);
+    }, c.actionType === 'direct' ? 1300 : 800);
   };
-  const rollback = (id: string) => {
-    setShipped((s) => { const n = { ...s }; delete n[id]; return n; });
+  const cancel = (id: string) => {
+    setActions((s) => { const n = { ...s }; delete n[id]; return n; });
   };
 
   const filters = [
@@ -592,6 +657,19 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
           </div>
         </div>
 
+        {inFlight.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 inline-flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />In flight · sent for review · {inFlight.length}
+            </div>
+            <div className="space-y-2">
+              {inFlight.map((c) => (
+                <ClusterCard key={c.id} c={c} selected={selected === c.id} onSelect={setSelected} status="routed" />
+              ))}
+            </div>
+          </div>
+        )}
+
         {shippedList.length > 0 && (
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Shipped this trial · {shippedList.length}</div>
@@ -606,7 +684,7 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
 
       <div className="col-span-7">
         {applying === selected ? <LoadingDetail c={current} /> : (
-          <ClusterDetail c={current} justShipped={!!shipped[selected]} onApply={apply} onRollback={rollback} annotated={annotated} trialDay={trialDay} />
+          <ClusterDetail c={current} status={getStatus(current)} onApply={apply} onCancel={cancel} annotated={annotated} trialDay={trialDay} justActed={!!actions[selected]} />
         )}
       </div>
     </div>

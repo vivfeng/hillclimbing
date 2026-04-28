@@ -755,10 +755,18 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
           {monthlyDeflectedDelta.toLocaleString()} more conversations deflected per month vs. baseline · ${snap.costPerTicket.toFixed(2)} avg cost per ticket · {snap.monthlyVolume.toLocaleString()} monthly volume.
           {annotated && <NBadge n={6} />}
         </div>
-        <div className="mt-auto pt-4">
-          <button className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-blue-300 bg-white text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50 transition">
+        <div className="mt-auto pt-4 relative group">
+          <button
+            disabled
+            aria-disabled="true"
+            title="Coming soon — would generate a one-page ROI summary for the economic buyer"
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-dashed border-slate-300 bg-white/60 text-slate-500 px-3 py-2 rounded-md cursor-not-allowed"
+          >
             Export buyer one-pager <ArrowUpRight className="w-4 h-4" />
           </button>
+          <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition text-[11px] font-medium text-white bg-slate-900 px-2 py-1 rounded-md whitespace-nowrap shadow-lg">
+            Coming soon — generates a one-page ROI summary for the buyer
+          </div>
         </div>
       </div>
 

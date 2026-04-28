@@ -18,10 +18,10 @@ const DATASET_URL = 'https://huggingface.co/datasets/strova-ai/customer_support_
 /* ============================== FIXTURES ============================== */
 
 const WHY = {
-  knowledge: { label: 'Knowledge', icon: BookOpen, text: 'text-blue-700',  bg: 'bg-blue-50',   border: 'border-blue-200' },
-  reasoning: { label: 'Reasoning', icon: Brain,    text: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
-  policy:    { label: 'Policy',    icon: Shield,   text: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
-  tool:      { label: 'Tool',      icon: Wrench,   text: 'text-rose-700',   bg: 'bg-rose-50',   border: 'border-rose-200' },
+  knowledge: { label: 'Knowledge', icon: BookOpen, text: 'text-slate-700', bg: 'bg-slate-100', border: 'border-slate-200' },
+  reasoning: { label: 'Reasoning', icon: Brain,    text: 'text-slate-700', bg: 'bg-slate-100', border: 'border-slate-200' },
+  policy:    { label: 'Policy',    icon: Shield,   text: 'text-slate-700', bg: 'bg-slate-100', border: 'border-slate-200' },
+  tool:      { label: 'Tool',      icon: Wrench,   text: 'text-slate-700', bg: 'bg-slate-100', border: 'border-slate-200' },
 };
 
 const CLUSTERS = [
@@ -171,14 +171,14 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
 
 function NBadge({ n, show = true }: { n: number; show?: boolean }) {
   if (!show) return null;
-  return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold ring-2 ring-amber-100 ml-1 shrink-0">{n}</span>;
+  return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold ring-2 ring-white ml-1 shrink-0">{n}</span>;
 }
 
 function Stat({ label, sub, value, accent = false, negative = false, badge }: { label: string; sub: string; value: React.ReactNode; accent?: boolean; negative?: boolean; badge?: React.ReactNode }) {
   return (
-    <div className={`relative rounded-lg border ${accent ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-white'} p-3`}>
+    <div className={`relative rounded-lg border ${accent ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white'} p-3`}>
       <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 flex items-center">{label}</div>
-      <div className={`text-2xl font-bold tabular-nums mt-0.5 ${accent ? 'text-indigo-700' : negative ? 'text-rose-700' : 'text-slate-900'}`}>{value}</div>
+      <div className={`text-2xl font-bold tabular-nums mt-0.5 ${accent ? 'text-blue-700' : negative ? 'text-rose-700' : 'text-slate-900'}`}>{value}</div>
       <div className="text-[10px] text-slate-500 mt-0.5">{sub}</div>
       {badge && <div className="absolute -top-2 -right-2">{badge}</div>}
     </div>
@@ -215,7 +215,7 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
   return (
     <button
       onClick={() => onSelect(c.id)}
-      className={`w-full text-left rounded-lg border p-3 transition ${selected ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+      className={`w-full text-left rounded-lg border p-3 transition ${selected ? 'border-blue-400 bg-blue-50/40 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
     >
       <div className="flex items-center gap-1.5 mb-1.5">
         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${w.bg} ${w.text} border ${w.border}`}>
@@ -223,7 +223,7 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
         </span>
         <span className="text-[10px] font-medium text-slate-500">{c.intent}</span>
         {c.source === 'imported' && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-700 bg-white border border-slate-200">
             <Sparkles className="w-3 h-3" />head-start
             {badges?.source && <NBadge n={badges.source} />}
           </span>
@@ -243,7 +243,7 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
         <div>
           <div className="text-slate-500 flex items-center">Contain · Deflect{badges?.containment && <NBadge n={badges.containment} />}</div>
           <div className="font-semibold tabular-nums text-slate-900">
-            {c.containment}% · <span className="text-indigo-700">{c.deflection}%</span>
+            {c.containment}% · <span className="text-blue-700">{c.deflection}%</span>
           </div>
         </div>
         <div>
@@ -271,13 +271,13 @@ function ValidationBand({ validation, optimistic = false, badge }: { validation:
     { label: `Explicit CSAT survey (n=${validation.csat.n || '—'})`, value: validation.csat.delta, suffix: ' ★', good: 'up' },
   ];
   return (
-    <div className={`rounded-lg border ${optimistic ? 'border-dashed border-amber-300 bg-amber-50/40' : 'border-emerald-200 bg-emerald-50/30'} p-4`}>
+    <div className={`rounded-lg border ${optimistic ? 'border-dashed border-slate-300 bg-slate-50' : 'border-emerald-200 bg-emerald-50/40'} p-4`}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 flex items-center">
           {optimistic ? 'Projected — validating' : 'Measured — implicit signals + CSAT'}
           {badge}
         </div>
-        {optimistic && <span className="text-[10px] text-amber-700">first reading expected in ~4h</span>}
+        {optimistic && <span className="text-[10px] text-slate-500">first reading expected in ~4h</span>}
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {items.map((it) => {
@@ -308,7 +308,7 @@ function estimateValidation(c: Cluster) {
 function LoadingDetail({ c }: { c: Cluster }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
-      <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mx-auto mb-3" />
+      <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
       <div className="text-sm font-semibold text-slate-900">Shipping fix to production…</div>
       <div className="text-xs text-slate-500 mt-1">Versioning edit · routing to {c.owner} · enabling for 100% of {c.intent} traffic</div>
       <div className="text-xs text-slate-400 mt-3">Implicit-signal validation typically appears in 2–4 hours.</div>
@@ -343,7 +343,7 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
             <span className="text-slate-300">·</span>
             <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{c.intent}</span>
             {c.source === 'imported' && (
-              <Pill className="text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200">
+              <Pill className="text-slate-700 bg-slate-100 border-slate-200">
                 <Sparkles className="w-3 h-3" />head-start library
               </Pill>
             )}
@@ -376,18 +376,18 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
         </div>
       </Section>
 
-      <div className="rounded-lg border-l-4 border-l-amber-400 border border-amber-200 bg-amber-50 p-3">
+      <div className="rounded-lg border-l-2 border-l-slate-900 border border-slate-200 bg-slate-50 p-3">
         <div className="flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-slate-700 mt-0.5 shrink-0" />
           <div className="flex-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 mb-0.5 flex items-center">Auto-detected gap{annotated && <NBadge n={5} />}</div>
-            <div className="text-sm text-amber-900">{c.gap}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 mb-0.5 flex items-center">Auto-detected gap{annotated && <NBadge n={5} />}</div>
+            <div className="text-sm text-slate-900">{c.gap}</div>
           </div>
         </div>
       </div>
 
       <Section title="Recommended action" badge={annotated ? <NBadge n={6} /> : null}>
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4">
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <div className="text-sm font-medium text-slate-900 mb-1">{c.action}</div>
@@ -397,7 +397,7 @@ function ClusterDetail({ c, justShipped, onApply, onRollback, annotated, trialDa
             </div>
             <div className="flex flex-col gap-1.5 items-end shrink-0">
               {!isShipped && (
-                <button onClick={() => onApply(c.id)} className="inline-flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-indigo-700 transition">
+                <button onClick={() => onApply(c.id)} className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-blue-700 transition">
                   Apply fix <ChevronRight className="w-4 h-4" />
                 </button>
               )}
@@ -551,29 +551,29 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
                 labelFormatter={(d) => `Trial day ${d}`}
                 formatter={((v: number, n: string) => [`${v}%`, n]) as never}
               />
-              <Line type="monotone" dataKey="deflection"  stroke="#4f46e5" strokeWidth={2.5} dot={false} name="Deflection (resolved)" />
+              <Line type="monotone" dataKey="deflection"  stroke="#0f172a" strokeWidth={2.5} dot={false} name="Deflection (resolved)" />
               <Line type="monotone" dataKey="containment" stroke="#94a3b8" strokeWidth={2}   strokeDasharray="5 4" dot={false} name="Containment (no handoff)" />
             </LineChart>
           </ResponsiveContainer>
         </div>
         <div className="flex items-center justify-between text-xs mt-2 ml-2 flex-wrap gap-2">
           <div className="flex gap-4 items-center">
-            <span className="flex items-center gap-1.5"><span className="w-4 h-0.5 bg-indigo-600" />Deflection · resolved</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-0.5 bg-blue-600" />Deflection · resolved</span>
             <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed border-slate-400" />Containment · no handoff{annotated && <NBadge n={2} />}</span>
           </div>
           <div className="text-slate-500">CSAT (latest survey wave): <span className="font-semibold text-slate-900 tabular-nums">{snap.csat.toFixed(2)} ★</span> · n={last.csatN}{annotated && <NBadge n={3} />}</div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-5 flex flex-col">
-        <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Projected annualized savings</div>
-        <div className="text-3xl font-bold text-indigo-900 tabular-nums">${(annualROI / 1000).toFixed(0)}K<span className="text-sm font-medium text-indigo-700 ml-1">/ yr</span></div>
+      <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-5 flex flex-col">
+        <div className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-1">Projected annualized savings</div>
+        <div className="text-3xl font-bold text-blue-900 tabular-nums">${(annualROI / 1000).toFixed(0)}K<span className="text-sm font-medium text-blue-700 ml-1">/ yr</span></div>
         <div className="text-xs text-slate-600 mt-2 leading-relaxed">
           {monthlyDeflectedDelta.toLocaleString()} more conversations deflected per month vs. baseline · ${snap.costPerTicket.toFixed(2)} avg cost per ticket · {snap.monthlyVolume.toLocaleString()} monthly volume.
           {annotated && <NBadge n={6} />}
         </div>
         <div className="mt-auto pt-4">
-          <button className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-indigo-300 bg-white text-indigo-700 px-3 py-2 rounded-md hover:bg-indigo-50 transition">
+          <button className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-blue-300 bg-white text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50 transition">
             Export buyer one-pager <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
@@ -594,7 +594,7 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
               <div className="w-14 text-xs font-semibold text-slate-500 tabular-nums pt-0.5">Day {e.day}</div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-slate-900 font-medium">{e.action}</div>
-                <div className="text-xs text-slate-500">{e.intent} · {e.owner}{e.clusterId && <> · linked to <span className="text-indigo-700 font-medium">{e.name}</span></>}</div>
+                <div className="text-xs text-slate-500">{e.intent} · {e.owner}{e.clusterId && <> · linked to <span className="text-blue-700 font-medium">{e.name}</span></>}</div>
               </div>
               <div className="text-sm font-semibold tabular-nums shrink-0">
                 {'deflectionLift' in e && e.deflectionLift && <span className="text-emerald-700">+{e.deflectionLift} pts deflection</span>}
@@ -620,10 +620,10 @@ export default function App() {
       <header className="border-b border-slate-200 bg-white sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-gradient-to-br from-indigo-500 to-fuchsia-500 grid place-items-center text-white text-xs font-bold">D</div>
+            <div className="w-7 h-7 rounded-md bg-slate-900 grid place-items-center text-white text-xs font-bold tracking-tight">D</div>
             <div className="font-semibold tracking-tight">Hillclimbing</div>
             <Pill className="text-slate-600 bg-slate-100 border-slate-200">Acme Apparel · Trial</Pill>
-            <a href={DATASET_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border text-slate-500 bg-white border-slate-200 hover:text-indigo-700 hover:border-indigo-200 transition" title="Conversation samples adapted from this public dataset">
+            <a href={DATASET_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border text-slate-500 bg-white border-slate-200 hover:text-blue-700 hover:border-blue-200 transition" title="Conversation samples adapted from this public dataset">
               <Database className="w-3 h-3" />data: strova-ai/customer_support_conversations_dataset
             </a>
           </div>
@@ -639,7 +639,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <button onClick={() => setAnnotated(!annotated)} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md border transition ${annotated ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <button onClick={() => setAnnotated(!annotated)} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md border transition ${annotated ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               {annotated ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               Annotations {annotated ? 'on' : 'off'}
             </button>
@@ -653,13 +653,13 @@ export default function App() {
 
       {annotated && (
         <aside className="fixed top-14 right-0 bottom-0 w-[320px] border-l border-slate-200 bg-white p-5 overflow-y-auto z-10">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-3 flex items-center gap-1.5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" />Thesis annotations · {tab}
           </div>
           <ol className="space-y-3">
             {ANNOTATIONS[tab].map((a) => (
               <li key={a.n} className="flex gap-2.5">
-                <span className="shrink-0 w-6 h-6 rounded-full bg-amber-400 text-amber-950 text-xs font-bold grid place-items-center mt-0.5">{a.n}</span>
+                <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold grid place-items-center mt-0.5">{a.n}</span>
                 <span className="text-xs text-slate-700 leading-relaxed">{a.t}</span>
               </li>
             ))}

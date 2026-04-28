@@ -417,22 +417,34 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
         )}
       </div>
       <div className="font-semibold text-sm text-slate-900 leading-snug">{c.name}</div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+      <div className="mt-2 grid grid-cols-4 gap-2 text-[11px]">
         <div>
           <div className="text-slate-500">Volume</div>
           <div className="font-semibold tabular-nums text-slate-900">{c.volumePerDay}/d</div>
         </div>
         <div>
-          <div className="text-slate-500 flex items-center">Contain · Deflect{badges?.containment && <NBadge n={badges.containment} />}</div>
-          <div className="font-semibold tabular-nums text-slate-900">
-            {c.containment}% · <span className="text-blue-700">{c.deflection}%</span>
-          </div>
+          <div className="text-slate-500">Containment</div>
+          <div className="font-semibold tabular-nums text-slate-700">{c.containment}%</div>
+        </div>
+        <div>
+          <div className="text-slate-500 flex items-center">Deflection{badges?.containment && <NBadge n={badges.containment} />}</div>
+          <div className="font-bold tabular-nums text-blue-700">{c.deflection}%</div>
         </div>
         <div>
           <div className="text-slate-500">Proj. lift</div>
           <div className="font-semibold tabular-nums text-emerald-700">{fmtRange(c.projectedLiftRange)}</div>
         </div>
       </div>
+      {status === 'shipped' && c.validation && (
+        <div className="mt-2 pt-2 border-t border-emerald-100 flex items-center gap-1.5 text-[10px] flex-wrap">
+          <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold shrink-0">
+            <Check className="w-3 h-3" />Validated
+          </span>
+          <span className="text-slate-600 tabular-nums">
+            rephrase {c.validation.rephraseRate}% · escalation {c.validation.escalationRate}% · CSAT +{c.validation.csat.delta}
+          </span>
+        </div>
+      )}
       {status !== 'shipped' && c.primarySignal && (() => {
         const t = trendDelta(c.primarySignal.trend7d);
         return (
@@ -674,6 +686,22 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
   const inFlight  = visible.filter((c) => getStatus(c) === 'routed');
   const shippedList = visible.filter((c) => getStatus(c) === 'shipped');
 
+  // When the active filter would hide the currently-selected cluster, jump
+  // the detail panel to the first cluster that's still visible.
+  useEffect(() => {
+    if (visible.some((c) => c.id === selected)) return;
+    const next = visible[0];
+    if (next) setSelected(next.id);
+  }, [whyFilter, selected, visible, setSelected]);
+
+  // Always-visible status strip; numbers swap on Day 7 ⇄ Day 21 toggle so a
+  // reviewer toggling back and forth feels the trial progress directly.
+  const snap = getSnapshot(trialDay);
+  const allShipped = CLUSTERS.filter((c) => getStatus(c) === 'shipped').length;
+  const allOpen    = CLUSTERS.filter((c) => getStatus(c) === 'open').length;
+  const allFlight  = CLUSTERS.filter((c) => getStatus(c) === 'routed').length;
+  const day7Snap = getSnapshot(7);
+
   const current = CLUSTERS.find((c) => c.id === selected) as Cluster;
 
   const apply = (id: string) => {
@@ -696,7 +724,27 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
   ];
 
   return (
-    <div className="grid grid-cols-12 gap-5">
+    <div className="space-y-4">
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 flex items-center justify-between gap-4 text-xs text-slate-600 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="font-semibold text-slate-900">Day {trialDay} of 30</span>
+          <span className="text-slate-300">·</span>
+          <span><span className="font-semibold tabular-nums text-emerald-700">{allShipped}</span> shipped</span>
+          <span><span className="font-semibold tabular-nums text-slate-700">{allFlight}</span> in flight</span>
+          <span><span className="font-semibold tabular-nums text-slate-700">{allOpen}</span> open</span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span>slope <span className="font-semibold tabular-nums text-emerald-700">+{snap.slopePerWeek}</span> <span className="text-slate-400">±{snap.slopeCI}</span> pts/wk</span>
+          <span className="text-slate-300">·</span>
+          <span>deflection <span className="font-semibold tabular-nums text-blue-700">{snap.deflection}%</span></span>
+          {trialDay === 21 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border text-emerald-700 bg-emerald-50 border-emerald-200">
+              +{(snap.deflection - day7Snap.deflection).toFixed(1)} pts vs Day 7 · CI {day7Snap.slopeCI > 0 ? `${(day7Snap.slopeCI / snap.slopeCI).toFixed(1)}× tighter` : 'tightening'}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-12 gap-5">
       <div className="col-span-5 space-y-4">
         <div>
           <div className="text-xs font-semibold text-slate-500 inline-flex items-center gap-1.5 mb-1.5">
@@ -764,13 +812,14 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
           <ClusterDetail c={current} status={getStatus(current)} onApply={apply} onCancel={cancel} annotated={annotated} trialDay={trialDay} justActed={!!actions[selected]} />
         )}
       </div>
+      </div>
     </div>
   );
 }
 
 /* ============================== SCORECARD ============================== */
 
-function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boolean }) {
+function Scorecard({ trialDay, annotated, onNavigateToCluster }: { trialDay: number; annotated: boolean; onNavigateToCluster: (id: string) => void }) {
   const snap = getSnapshot(trialDay);
   const data = SLOPE.slice(0, trialDay + 1);
   const events = TIMELINE.filter((e) => e.day <= trialDay);
@@ -862,7 +911,20 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
               <div className="w-14 text-xs font-semibold text-slate-500 tabular-nums pt-0.5">Day {e.day}</div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-slate-900 font-medium">{e.action}</div>
-                <div className="text-xs text-slate-500">{e.intent} · {e.owner}{e.clusterId && <> · linked to <span className="text-blue-700 font-medium">{e.name}</span></>}</div>
+                <div className="text-xs text-slate-500">
+                  {e.intent} · {e.owner}
+                  {e.clusterId && (
+                    <> · linked to{' '}
+                      <button
+                        onClick={() => onNavigateToCluster(e.clusterId as string)}
+                        className="text-blue-700 font-medium hover:underline focus:underline focus:outline-none"
+                        title="Open this cluster in the Workbench"
+                      >
+                        {e.name}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="text-sm font-semibold tabular-nums shrink-0">
                 {'deflectionLift' in e && e.deflectionLift && <span className="text-emerald-700">+{e.deflectionLift} pts deflection</span>}
@@ -965,6 +1027,10 @@ export default function App() {
     if (typeof window !== 'undefined') localStorage.setItem('hillclimbing.welcomed', '1');
     setShowWelcome(false);
   };
+  const navigateToCluster = (id: string) => {
+    setTab('workbench');
+    setSelected(id);
+  };
   const startTour = () => { dismissWelcome(); setTourStep(0); applyStep(0); };
   const nextStep = () => {
     if (tourStep === null) return;
@@ -1014,7 +1080,7 @@ export default function App() {
       <main className={`max-w-7xl mx-auto w-full px-6 py-6 transition-all flex-1 ${annotated ? 'pr-[340px]' : ''}`}>
         {tab === 'workbench'
           ? <Workbench trialDay={trialDay} annotated={annotated} selected={selected} setSelected={setSelected} />
-          : <Scorecard trialDay={trialDay} annotated={annotated} />}
+          : <Scorecard trialDay={trialDay} annotated={annotated} onNavigateToCluster={navigateToCluster} />}
       </main>
 
       <footer className={`border-t border-slate-200 bg-white transition-all ${annotated ? 'pr-[320px]' : ''}`}>

@@ -272,7 +272,7 @@ type TourStep = { title: string; body: string; state: TourState; target?: string
 const TOUR: TourStep[] = [
   {
     title: 'The Workbench',
-    body: 'Failure clusters are ranked by impact and uncertainty (volume × low confidence × bad outcome). Top of list auto-selected — your morning starts here.',
+    body: 'Failure clusters are ranked by leverage — volume × (1 − confidence) × outcome severity. The top entry is auto-selected; your morning starts here.',
     state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
     target: '[data-tour-target="open-list"]',
   },
@@ -290,7 +290,7 @@ const TOUR: TourStep[] = [
   },
   {
     title: 'Time-shift to Day 21',
-    body: 'Four fixes have shipped. Each shipped cluster carries a measured before/after band with a confidence badge tied to sample size (high · medium · low).',
+    body: 'Four fixes have shipped. Click into one and the detail panel leads with the validated impact strip — deflection lift, rephrase rate, mid-flow escalation, and CSAT delta on this cluster — instead of stale pre-fix numbers.',
     state: { tab: 'workbench', trialDay: 21, selected: 'c1', annotated: false },
     target: '[data-tour-target="validated-impact"]',
   },
@@ -716,10 +716,17 @@ type ClusterStatus = 'open' | 'routed' | 'shipped';
 
 function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: number; annotated: boolean; selected: string; setSelected: (id: string) => void }) {
   const [whyFilter, setWhyFilter] = useState<string>('all');
+  const [whereFilter, setWhereFilter] = useState<string>('all');
   const [actions, setActions] = useState<Record<string, 'shipped' | 'routed'>>({});
   const [applying, setApplying] = useState<string | null>(null);
 
-  const visible = useMemo(() => CLUSTERS.filter((c) => whyFilter === 'all' || c.why === whyFilter), [whyFilter]);
+  const visible = useMemo(
+    () => CLUSTERS.filter((c) =>
+      (whyFilter === 'all' || c.why === whyFilter) &&
+      (whereFilter === 'all' || c.intent === whereFilter)
+    ),
+    [whyFilter, whereFilter]
+  );
   const getStatus = (c: Cluster): ClusterStatus => actions[c.id] ?? (c.statusByDay[trialDay as 7 | 21] as ClusterStatus);
   const open      = visible.filter((c) => getStatus(c) === 'open').sort((a, b) => b.volumePerDay * (1 - b.confidence) - a.volumePerDay * (1 - a.confidence));
   const inFlight  = visible.filter((c) => getStatus(c) === 'routed');
@@ -731,7 +738,7 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
     if (visible.some((c) => c.id === selected)) return;
     const next = visible[0];
     if (next) setSelected(next.id);
-  }, [whyFilter, selected, visible, setSelected]);
+  }, [whyFilter, whereFilter, selected, visible, setSelected]);
 
   // Always-visible status strip; numbers swap on Day 7 ⇄ Day 21 toggle so a
   // reviewer toggling back and forth feels the trial progress directly.
@@ -757,9 +764,15 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
     setActions((s) => { const n = { ...s }; delete n[id]; return n; });
   };
 
-  const filters = [
+  const whyFilters = [
     { id: 'all', label: 'All', count: CLUSTERS.length },
     ...Object.keys(WHY).map((k) => ({ id: k, label: WHY[k as keyof typeof WHY].label, count: CLUSTERS.filter((c) => c.why === k).length })),
+  ];
+  const whereFilters = [
+    { id: 'all', label: 'All', count: CLUSTERS.length },
+    ...Array.from(new Set(CLUSTERS.map((c) => c.intent))).map((intent) => ({
+      id: intent, label: intent, count: CLUSTERS.filter((c) => c.intent === intent).length,
+    })),
   ];
 
   return (
@@ -789,21 +802,40 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
           <div className="text-xs font-semibold text-slate-500 inline-flex items-center gap-1.5 mb-1.5">
             <Filter className="w-3 h-3" />Why × Where{annotated && <NBadge n={3} />}
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {filters.map((f) => {
-              const active = whyFilter === f.id;
-              return (
-                <button key={f.id} onClick={() => setWhyFilter(f.id)} className={`text-xs font-medium px-2.5 py-1 rounded-md border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'}`}>
-                  {f.label}<span className="opacity-60 ml-1 tabular-nums">{f.count}</span>
-                </button>
-              );
-            })}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 w-12 shrink-0">Why</span>
+              {whyFilters.map((f) => {
+                const active = whyFilter === f.id;
+                return (
+                  <button key={f.id} onClick={() => setWhyFilter(f.id)} className={`text-xs font-medium px-2.5 py-1 rounded-md border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'}`}>
+                    {f.label}<span className="opacity-60 ml-1 tabular-nums">{f.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 w-12 shrink-0">Where</span>
+              {whereFilters.map((f) => {
+                const active = whereFilter === f.id;
+                return (
+                  <button key={f.id} onClick={() => setWhereFilter(f.id)} className={`text-xs font-medium px-2.5 py-1 rounded-md border transition ${active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'}`}>
+                    {f.label}<span className="opacity-60 ml-1 tabular-nums">{f.count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         <div data-tour-target="open-list">
           <div className="flex items-baseline justify-between mb-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center">Open · ranked by leverage{annotated && <NBadge n={2} />}</div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center cursor-help"
+              title="Leverage = volume × (1 − confidence) × outcome severity. Operator never goes hunting for what to fix next."
+            >
+              Open · ranked by leverage{annotated && <NBadge n={2} />}
+            </div>
             <div className="text-[11px] text-slate-500">{open.length} cluster{open.length !== 1 && 's'}</div>
           </div>
           <div className="space-y-2">
@@ -1023,7 +1055,7 @@ function OnePagerModal({
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 overflow-y-auto" onClick={onClose}>
       <div className="bg-slate-100 rounded-2xl shadow-2xl max-w-3xl w-full my-6" onClick={(e) => e.stopPropagation()}>
         {/* Modal toolbar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white rounded-t-2xl">
+        <div data-one-pager-toolbar className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white rounded-t-2xl">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
             <ArrowUpRight className="w-3 h-3" />Buyer one-pager · preview
           </div>
@@ -1041,7 +1073,7 @@ function OnePagerModal({
         </div>
 
         {/* Document body — styled to look like a printable page */}
-        <div className="bg-white m-5 p-8 rounded-lg shadow-sm border border-slate-200 space-y-6">
+        <div data-one-pager className="bg-white m-5 p-8 rounded-lg shadow-sm border border-slate-200 space-y-6">
           {/* Header */}
           <div className="flex items-start justify-between border-b border-slate-200 pb-4">
             <div className="flex items-center gap-3">
@@ -1231,7 +1263,7 @@ function TourCard({ step, onPrev, onNext, onClose }: { step: number; onPrev: () 
   return (
     <>
       {/* Dim overlay with a hole punched out for the targeted element */}
-      <div className="fixed inset-0 z-30 pointer-events-none">
+      <div data-tour-overlay className="fixed inset-0 z-30 pointer-events-none">
         {r ? (
           <div
             className="absolute rounded-lg transition-all"

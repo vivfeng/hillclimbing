@@ -2,3 +2,22 @@
 
 html, body, #root { height: 100%; margin: 0; }
 body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+/* When the buyer one-pager is being printed, hide the rest of the app
+   (header, banner, modal toolbar, dim backdrop) and let only the document
+   itself render to paper. */
+@media print {
+  body * { visibility: hidden; }
+  body:has([data-one-pager]) [data-one-pager],
+  body:has([data-one-pager]) [data-one-pager] * { visibility: visible; }
+  [data-one-pager] {
+    position: absolute;
+    inset: 0;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  /* Belt and braces — hide the modal chrome explicitly */
+  [data-one-pager-toolbar], [data-tour-overlay] { display: none !important; }
+}

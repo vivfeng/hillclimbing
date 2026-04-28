@@ -41,7 +41,7 @@ const CLUSTERS = [
     action: 'Add extended-returns policy article to KB (covers holiday window + gift returns)',
     owner: 'Docs',
     actionType: 'direct' as const, actionVerb: 'Publish to KB',
-    actionMicro: 'Article publishes to the agent KB. Picked up on the next conversation. First validation reading in ~4h.',
+    actionMicro: 'Publishes to the agent KB. Picked up on the next conversation. Validation in ~4h.',
     statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 4, routedDay: null,
     validation: { rephraseRate: -38, escalationRate: -42, repeatRate48h: -29, csat: { delta: 0.6, n: 47 } },
   },
@@ -59,7 +59,7 @@ const CLUSTERS = [
     action: 'Add stacking-rules pre-check to agent prompt before quoting any total',
     owner: 'Agent Config',
     actionType: 'direct' as const, actionVerb: 'Deploy prompt change',
-    actionMicro: 'Prompt rolls out to 100% of Promotions traffic immediately. First validation reading in ~4h.',
+    actionMicro: 'Deploys to 100% of Promotions traffic. Validation in ~4h.',
     statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 6, routedDay: null,
     validation: { rephraseRate: -22, escalationRate: -31, repeatRate48h: -18, csat: { delta: 0.4, n: 32 } },
   },
@@ -113,7 +113,7 @@ const CLUSTERS = [
     action: 'Update prompt: check shipment status before promising address change; escalate if shipped',
     owner: 'Agent Config',
     actionType: 'direct' as const, actionVerb: 'Deploy prompt change',
-    actionMicro: 'Prompt rolls out to 100% of Shipping traffic immediately. First validation reading in ~4h.',
+    actionMicro: 'Deploys to 100% of Shipping traffic. Validation in ~4h.',
     statusByDay: { 7: 'open', 21: 'open' }, shippedDay: null, routedDay: null,
     validation: null,
   },
@@ -130,30 +130,111 @@ const CLUSTERS = [
     action: 'Add tier-specific points-expiration table to KB',
     owner: 'Docs',
     actionType: 'direct' as const, actionVerb: 'Publish to KB',
-    actionMicro: 'Article publishes to the agent KB. Picked up on the next conversation. First validation reading in ~4h.',
+    actionMicro: 'Publishes to the agent KB. Picked up on the next conversation. Validation in ~4h.',
     statusByDay: { 7: 'open', 21: 'shipped' }, shippedDay: 19, routedDay: null,
     validation: { rephraseRate: -19, escalationRate: -24, repeatRate48h: -16, csat: { delta: 0.3, n: 14 } },
   },
 ];
 
+// The trial trajectory is built from three additive parts:
+//   1. Baseline (day 0 = no AI hill-climbing yet).
+//   2. Cumulative effect of shipped fixes (matches TIMELINE), with linear
+//      ramp-in over ~3 days as each fix takes effect across live conversations.
+//   3. Small natural drift (operator + agent learning each day).
+// SNAPSHOT levels and the headline slope are then read directly off this
+// curve, so the chart line, the headline number, and the ROI all share a
+// single source of truth.
+const BASELINE = { deflection: 38, containment: 64, csat: 3.40 };
+const DRIFT_PER_DAY = { deflection: 0.34, containment: 0.20, csat: 0.012 };
+
+const SHIPMENTS = [
+  { day: 4,  deflection: 3.8, containment: 1.5, csat: 0.05 },
+  { day: 6,  deflection: 2.1, containment: 0.8, csat: 0.04 },
+  { day: 9,  deflection: 0,   containment: 0.5, csat: 0.04 },
+  { day: 12, deflection: 5.1, containment: 2.0, csat: 0.07 },
+  { day: 16, deflection: 1.4, containment: 0.6, csat: 0.03 },
+  { day: 19, deflection: 0.8, containment: 0.4, csat: 0.02 },
+];
+
+// 30% on ship day, +25%/day, full effect by ship day + 3
+function rampFraction(dayDelta: number): number {
+  if (dayDelta < 0) return 0;
+  return Math.min(1, 0.3 + dayDelta * 0.25);
+}
+
+function curveAt(day: number) {
+  const lifts = SHIPMENTS.reduce((acc, s) => {
+    const f = rampFraction(day - s.day);
+    return {
+      deflection:  acc.deflection  + f * s.deflection,
+      containment: acc.containment + f * s.containment,
+      csat:        acc.csat        + f * s.csat,
+    };
+  }, { deflection: 0, containment: 0, csat: 0 });
+  return {
+    deflection:  BASELINE.deflection  + day * DRIFT_PER_DAY.deflection  + lifts.deflection,
+    containment: BASELINE.containment + day * DRIFT_PER_DAY.containment + lifts.containment,
+    csat:        BASELINE.csat        + day * DRIFT_PER_DAY.csat        + lifts.csat,
+  };
+}
+
 const SLOPE = (() => {
   const out: { day: number; deflection: number; containment: number; csat: number; csatN: number }[] = [];
   for (let d = 0; d <= 30; d++) {
-    let def: number, con: number;
-    if (d <= 5)       { def = 38 + d * 0.6;            con = 64 + d * 0.3; }
-    else if (d <= 25) { def = 41 + (d - 5) * 0.95;     con = 65.5 + (d - 5) * 0.45; }
-    else              { def = 60 + (d - 25) * 0.4;     con = 74.5 + (d - 25) * 0.2; }
-    const wob = (n: number) => Math.sin(d * 0.55 + n) * 0.5;
+    const c = curveAt(d);
     out.push({
       day: d,
-      deflection:  +(def + wob(1)).toFixed(1),
-      containment: +(con + wob(2)).toFixed(1),
-      csat:        +(3.4 + d * 0.022 + wob(3) * 0.04).toFixed(2),
+      deflection:  +c.deflection.toFixed(2),
+      containment: +c.containment.toFixed(2),
+      csat:        +c.csat.toFixed(3),
       csatN: 6 + Math.floor(d * 1.1),
     });
   }
   return out;
 })();
+
+// 7 calendar days = last 8 daily readings (days t-7 .. t).
+const ROLLING_WINDOW_DAYS = 7;
+function rollingDeflectionRegression(end: number) {
+  const start = Math.max(0, end - ROLLING_WINDOW_DAYS);
+  const slice = SLOPE.slice(start, end + 1);
+  const n = slice.length;
+  if (n < 3) return { slopePerWeek: 0, slopeCI: 0 };
+  const xMean = slice.reduce((s, p) => s + p.day, 0) / n;
+  const yMean = slice.reduce((s, p) => s + p.deflection, 0) / n;
+  let num = 0, den = 0;
+  for (const p of slice) {
+    num += (p.day - xMean) * (p.deflection - yMean);
+    den += (p.day - xMean) ** 2;
+  }
+  const slopePerDay = num / den;
+  let sse = 0;
+  for (const p of slice) {
+    const yPred = yMean + slopePerDay * (p.day - xMean);
+    sse += (p.deflection - yPred) ** 2;
+  }
+  const seSlope = Math.sqrt(sse / Math.max(1, n - 2)) / Math.sqrt(den);
+  const z80 = 1.282;
+  return {
+    slopePerWeek: +(slopePerDay * 7).toFixed(1),
+    slopeCI:      +(z80 * seSlope * 7).toFixed(1),
+  };
+}
+
+function getSnapshot(day: number) {
+  const p = SLOPE[day];
+  const reg = rollingDeflectionRegression(day);
+  return {
+    deflection:    +p.deflection.toFixed(1),
+    containment:   +p.containment.toFixed(1),
+    csat:          +p.csat.toFixed(2),
+    csatN:         p.csatN,
+    slopePerWeek:  reg.slopePerWeek,
+    slopeCI:       reg.slopeCI,
+    monthlyVolume: 47200,
+    costPerTicket: 8.50,
+  };
+}
 
 const TIMELINE = [
   { day: 4,  clusterId: 'c1', name: 'Extended return window confusion', action: 'Added KB article on holiday + gift return windows',  deflectionLift: 3.8, intent: 'Refunds',     owner: 'Docs' },
@@ -164,10 +245,6 @@ const TIMELINE = [
   { day: 19, clusterId: 'c6', name: 'Loyalty points expiration',         action: 'Added tier-specific expiration table',               deflectionLift: 0.8, intent: 'Account',     owner: 'Docs' },
 ] as const;
 
-const SNAPSHOT: Record<number, { deflection: number; containment: number; csat: number; slopePerWeek: number; slopeCI: number; monthlyVolume: number; costPerTicket: number }> = {
-  7:  { deflection: 44.2, containment: 67.8, csat: 3.55, slopePerWeek: 0.9, slopeCI: 1.1, monthlyVolume: 47200, costPerTicket: 8.50 },
-  21: { deflection: 58.4, containment: 73.9, csat: 3.92, slopePerWeek: 3.2, slopeCI: 0.6, monthlyVolume: 47200, costPerTicket: 8.50 },
-};
 
 const ANNOTATIONS = {
   workbench: [
@@ -194,7 +271,7 @@ type TourState = { tab: 'workbench' | 'scorecard'; trialDay: number; selected: s
 const TOUR: { title: string; body: string; state: TourState }[] = [
   {
     title: 'The Workbench',
-    body: 'Failure clusters are auto-ranked by leverage (volume × low-confidence × bad outcome). The top one is pre-selected — that\'s where you start each morning.',
+    body: 'Failure clusters are ranked by impact and uncertainty (volume × low confidence × bad outcome). Top of list auto-selected — your morning starts here.',
     state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
   },
   {
@@ -214,7 +291,7 @@ const TOUR: { title: string; body: string; state: TourState }[] = [
   },
   {
     title: 'The buyer\'s artifact',
-    body: 'Headline: +3.2 ±0.6 pts/wk slope — rate, not level. Definition of "deflection" was locked at trial start. Each timeline lift links back to the cluster that produced it. ROI is computed off the current slope.',
+    body: 'Headline: +3.2 ±0.6 pts/wk — rate, not level. Deflection definition locked at trial start. Timeline lifts link back to source clusters. ROI projected from current slope.',
     state: { tab: 'scorecard', trialDay: 21, selected: 'c1', annotated: false },
   },
   {
@@ -377,15 +454,15 @@ function ValidationBand({ validation, optimistic = false, badge }: { validation:
     return (
       <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-4 text-sm text-slate-500 flex items-center gap-2">
         <Inbox className="w-4 h-4" />
-        Implicit-signal validation appears here within ~4 hours of shipping a fix.
+        Validation appears here ~4h after a fix ships.
       </div>
     );
   }
   const items = [
-    { label: 'Rephrase rate (in-conversation)', value: validation.rephraseRate, suffix: '%', good: 'down' },
-    { label: 'Mid-flow escalation requests',    value: validation.escalationRate, suffix: '%', good: 'down' },
-    { label: '48h repeat contact rate',         value: validation.repeatRate48h, suffix: '%', good: 'down' },
-    { label: `Explicit CSAT survey (n=${validation.csat.n || '—'})`, value: validation.csat.delta, suffix: ' ★', good: 'up' },
+    { label: 'Rephrase rate',           value: validation.rephraseRate, suffix: '%', good: 'down' },
+    { label: 'Mid-flow escalations',    value: validation.escalationRate, suffix: '%', good: 'down' },
+    { label: '48h repeat contact',      value: validation.repeatRate48h, suffix: '%', good: 'down' },
+    { label: `CSAT survey (n=${validation.csat.n || '—'})`, value: validation.csat.delta, suffix: ' ★', good: 'up' },
   ];
   const conf = confidenceLevel(optimistic ? 0 : (validation.csat.n || 0));
   return (
@@ -434,7 +511,7 @@ function LoadingDetail({ c }: { c: Cluster }) {
       <div className="text-xs text-slate-500 mt-1">
         {direct
           ? `Versioning edit · enabling for 100% of ${c.intent} traffic`
-          : `Sending cluster context + recommended action · awaiting ack from ${c.owner}`}
+          : `Sending cluster context + recommended action`}
       </div>
       <div className="text-xs text-slate-400 mt-3">{direct ? 'Implicit-signal validation typically appears in 2–4 hours.' : `Typical SLA: ${c.actionType === 'routed' ? '2–5 days for resolution.' : ''}`}</div>
     </div>
@@ -483,12 +560,12 @@ function ClusterDetail({ c, status, justActed, onApply, onCancel, annotated, tri
 
       <div className="grid grid-cols-4 gap-3">
         <Stat label="Containment" sub="No-handoff rate" value={`${c.containment}%`} />
-        <Stat label="Deflection" sub="Truly resolved" value={`${c.deflection}%`} accent badge={annotated ? <NBadge n={1} /> : null} />
+        <Stat label="Deflection" sub="Resolved without repeat" value={`${c.deflection}%`} accent badge={annotated ? <NBadge n={1} /> : null} />
         <Stat label="Volume" sub="Conversations / day" value={c.volumePerDay} />
-        <Stat label="CSAT drag" sub="Pts on overall score" value={c.csatDrag.toFixed(2)} negative />
+        <Stat label="CSAT drag" sub="Effect on overall CSAT" value={c.csatDrag.toFixed(2)} negative />
       </div>
 
-      <Section title="Representative transcripts" subtitle={`${c.transcripts.length} of ~${Math.round(c.volumePerDay * 7 * 0.4)} weekly samples · adapted from strova-ai customer-support corpus`}>
+      <Section title="Representative transcripts" subtitle={`${c.transcripts.length} of ~${Math.round(c.volumePerDay * 7 * 0.4)} weekly samples`}>
         <div className="space-y-2">
           {c.transcripts.map((t, i) => (
             <div key={i} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
@@ -565,11 +642,11 @@ function ClusterDetail({ c, status, justActed, onApply, onCancel, annotated, tri
             <div className="flex items-start gap-3">
               <Clock className="w-5 h-5 text-slate-500 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <div className="text-sm font-semibold text-slate-900">Sent day {c.routedDay ?? trialDay} · {c.owner} acked day {(c.routedDay ?? trialDay) + 1}</div>
+                <div className="text-sm font-semibold text-slate-900">Sent day {c.routedDay ?? trialDay} · Acknowledged by {c.owner} day {(c.routedDay ?? trialDay) + 1}</div>
                 <div className="text-xs text-slate-600 mt-1">{c.actionMicro}</div>
                 <div className="text-xs text-slate-500 mt-3 inline-flex items-center gap-1.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400" />
-                  Validation band populates here automatically once the owner ships the change.
+                  Validation populates here once the owner ships.
                 </div>
               </div>
             </div>
@@ -660,7 +737,7 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
         {inFlight.length > 0 && (
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 inline-flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />In flight · sent for review · {inFlight.length}
+              <Clock className="w-3 h-3" />In flight · {inFlight.length} awaiting owner{inFlight.length === 1 ? '' : 's'}
             </div>
             <div className="space-y-2">
               {inFlight.map((c) => (
@@ -694,7 +771,7 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
 /* ============================== SCORECARD ============================== */
 
 function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boolean }) {
-  const snap = SNAPSHOT[trialDay];
+  const snap = getSnapshot(trialDay);
   const data = SLOPE.slice(0, trialDay + 1);
   const events = TIMELINE.filter((e) => e.day <= trialDay);
   const monthlyDeflectedDelta = Math.round((snap.monthlyVolume * (snap.deflection - 38)) / 100);
@@ -716,7 +793,7 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
                 <span className="text-base font-medium text-slate-500">deflection</span>
               </div>
             </div>
-            <div className="text-xs text-slate-500 mt-1">Headline is rate of improvement, not level. 80% CI from {trialDay}-day rolling regression. Current deflection: {snap.deflection}% · containment: {snap.containment}%.</div>
+            <div className="text-xs text-slate-500 mt-1">Headline is rate of improvement, not level. 80% CI from 7-day rolling regression on the deflection series. Current deflection: {snap.deflection}% · containment: {snap.containment}%.</div>
           </div>
           <Pill className="text-slate-700 bg-slate-50 border-slate-200 shrink-0">
             <Lock className="w-3 h-3" />Deflection = no repeat contact within 5 days
@@ -734,7 +811,7 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
                 labelFormatter={(d) => `Trial day ${d}`}
                 formatter={((v: number, n: string) => [`${v}%`, n]) as never}
               />
-              <Line type="monotone" dataKey="deflection"  stroke="#0f172a" strokeWidth={2.5} dot={false} name="Deflection (resolved)" />
+              <Line type="monotone" dataKey="deflection"  stroke="#2563eb" strokeWidth={2.5} dot={false} name="Deflection (resolved)" />
               <Line type="monotone" dataKey="containment" stroke="#94a3b8" strokeWidth={2}   strokeDasharray="5 4" dot={false} name="Containment (no handoff)" />
             </LineChart>
           </ResponsiveContainer>
@@ -774,12 +851,12 @@ function Scorecard({ trialDay, annotated }: { trialDay: number; annotated: boole
         <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center">Attributed improvement timeline{annotated && <NBadge n={5} />}</div>
-            <div className="text-sm text-slate-700">Every lift links to the Workbench cluster that produced it — story is traceable, not vibes.</div>
+            <div className="text-sm text-slate-700">Every lift links to the Workbench cluster that produced it — so the story is auditable.</div>
           </div>
         </div>
         <div className="space-y-1">
           {events.length === 0 ? (
-            <div className="py-6 text-center text-sm text-slate-500">No fixes shipped yet — timeline populates as the operator works through the Workbench.</div>
+            <div className="py-6 text-center text-sm text-slate-500">No fixes shipped yet — timeline populates as you ship from the Workbench.</div>
           ) : events.map((e) => (
             <div key={e.day} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
               <div className="w-14 text-xs font-semibold text-slate-500 tabular-nums pt-0.5">Day {e.day}</div>
@@ -811,7 +888,7 @@ function WelcomeModal({ onTour, onClose }: { onTour: () => void; onClose: () => 
         </div>
         <h2 className="text-xl font-semibold text-slate-900 mb-2 leading-tight">Decagon Hillclimbing — Acme Apparel trial, Day 7</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-4">
-          You're an Acme Apparel ops lead working through customer-support failure clusters with your Decagon CSM. The thesis: trials are won on <span className="font-semibold text-slate-900">slope</span> of improvement, not level — so the product is built around a tight find → fix → validate loop.
+          You're an Acme Apparel ops lead triaging customer-support failures with your Decagon CSM. Trials are won on <span className="font-semibold text-slate-900">slope</span>, not level — so Hillclimbing is built around a find → fix → validate loop.
         </p>
         <div className="space-y-1.5 mb-5 text-sm">
           <div className="flex items-baseline gap-3"><span className="font-semibold text-slate-900 w-24 shrink-0">Workbench</span><span className="text-slate-600">the daily driver — ranked clusters, drill in, ship a fix, watch validation.</span></div>
@@ -821,7 +898,7 @@ function WelcomeModal({ onTour, onClose }: { onTour: () => void; onClose: () => 
           <button onClick={onTour} className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-md transition">
             <Play className="w-4 h-4" />Start the 60-second tour
           </button>
-          <button onClick={onClose} className="text-sm font-medium text-slate-600 hover:text-slate-900">Just let me explore</button>
+          <button onClick={onClose} className="text-sm font-medium text-slate-600 hover:text-slate-900">Skip</button>
         </div>
       </div>
     </div>

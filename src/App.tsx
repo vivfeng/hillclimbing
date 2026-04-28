@@ -268,36 +268,43 @@ const ANNOTATIONS = {
 };
 
 type TourState = { tab: 'workbench' | 'scorecard'; trialDay: number; selected: string; annotated: boolean };
-const TOUR: { title: string; body: string; state: TourState }[] = [
+type TourStep = { title: string; body: string; state: TourState; target?: string };
+const TOUR: TourStep[] = [
   {
     title: 'The Workbench',
     body: 'Failure clusters are ranked by impact and uncertainty (volume × low confidence × bad outcome). Top of list auto-selected — your morning starts here.',
     state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
+    target: '[data-tour-target="open-list"]',
   },
   {
     title: 'Steering signals, not just confirmation',
     body: 'Each open cluster card shows a 7-day sparkline of its primary implicit signal. c3 (Order tracking) is trending up — getting worse fast — which is why it earns a top spot in the queue.',
     state: { tab: 'workbench', trialDay: 7, selected: 'c3', annotated: false },
+    target: '[data-tour-target="cluster-c3"]',
   },
   {
     title: 'Diagnose → propose → ship',
     body: 'On the right: representative transcripts, an auto-detected gap, and a recommended action with projected lift as a range (80% CI), routed to the right internal owner. One click to apply.',
     state: { tab: 'workbench', trialDay: 7, selected: 'c1', annotated: false },
+    target: '[data-tour-target="recommended-action"]',
   },
   {
     title: 'Time-shift to Day 21',
     body: 'Four fixes have shipped. Each shipped cluster carries a measured before/after band with a confidence badge tied to sample size (high · medium · low).',
     state: { tab: 'workbench', trialDay: 21, selected: 'c1', annotated: false },
+    target: '[data-tour-target="validated-impact"]',
   },
   {
     title: 'The buyer\'s artifact',
     body: 'Headline: +5.3 ±0.3 pts/wk — rate, not level. Deflection definition locked at trial start. Timeline lifts link back to source clusters. ROI projected from current level vs. baseline.',
     state: { tab: 'scorecard', trialDay: 21, selected: 'c1', annotated: false },
+    target: '[data-tour-target="trajectory-chart"]',
   },
   {
     title: 'Read the thesis callouts',
     body: 'Annotations are now on. 14 numbered callouts tie individual UI elements back to specific arguments in the case study — 8 on the Workbench, 6 on the Scorecard. Toggle any time from the header.',
     state: { tab: 'workbench', trialDay: 21, selected: 'c1', annotated: true },
+    target: '[data-tour-target="annotations-toggle"]',
   },
 ];
 
@@ -392,6 +399,7 @@ function ClusterCard({ c, selected, onSelect, status, badges }: { c: Cluster; se
   return (
     <button
       onClick={() => onSelect(c.id)}
+      data-tour-target={`cluster-${c.id}`}
       className={`w-full text-left rounded-lg border p-3 transition ${selected ? 'border-blue-400 bg-blue-50/40 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-slate-300'}`}
     >
       <div className="flex items-center gap-1.5 mb-1.5">
@@ -570,12 +578,43 @@ function ClusterDetail({ c, status, justActed, onApply, onCancel, annotated, tri
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
-        <Stat label="Containment" sub="No-handoff rate" value={`${c.containment}%`} />
-        <Stat label="Deflection" sub="Resolved without repeat" value={`${c.deflection}%`} accent badge={annotated ? <NBadge n={1} /> : null} />
-        <Stat label="Volume" sub="Conversations / day" value={c.volumePerDay} />
-        <Stat label="CSAT drag" sub="Effect on overall CSAT" value={c.csatDrag.toFixed(2)} negative />
-      </div>
+      {isShipped && c.validation ? (
+        <>
+          <div data-tour-target="validated-impact" className="grid grid-cols-4 gap-3">
+            <Stat
+              label="Deflection lift"
+              sub={`this cluster · ${c.deflection}% → ${(c.deflection + c.projectedLift).toFixed(1)}%`}
+              value={<span className="text-emerald-700">+{c.projectedLift} pts</span>}
+              badge={annotated ? <NBadge n={1} /> : null}
+            />
+            <Stat
+              label="Rephrase rate"
+              sub="In-conversation paraphrasing"
+              value={<span className="text-emerald-700">{c.validation.rephraseRate}%</span>}
+            />
+            <Stat
+              label="Mid-flow escalation"
+              sub="Hand-off requests during chat"
+              value={<span className="text-emerald-700">{c.validation.escalationRate}%</span>}
+            />
+            <Stat
+              label="CSAT (this cluster)"
+              sub={`Survey wave · n=${c.validation.csat.n}`}
+              value={<span className="text-emerald-700">+{c.validation.csat.delta} ★</span>}
+            />
+          </div>
+          <div className="text-[11px] text-slate-500 -mt-1">
+            Pre-fix baseline · containment {c.containment}% · deflection {c.deflection}% · volume {c.volumePerDay}/d · CSAT drag {c.csatDrag.toFixed(2)}
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-4 gap-3">
+          <Stat label="Containment" sub="No-handoff rate" value={`${c.containment}%`} />
+          <Stat label="Deflection" sub="Resolved without repeat" value={`${c.deflection}%`} accent badge={annotated ? <NBadge n={1} /> : null} />
+          <Stat label="Volume" sub="Conversations / day" value={c.volumePerDay} />
+          <Stat label="CSAT drag" sub="Effect on overall CSAT" value={c.csatDrag.toFixed(2)} negative />
+        </div>
+      )}
 
       <Section title="Representative transcripts" subtitle={`${c.transcripts.length} of ~${Math.round(c.volumePerDay * 7 * 0.4)} weekly samples`}>
         <div className="space-y-2">
@@ -605,7 +644,7 @@ function ClusterDetail({ c, status, justActed, onApply, onCancel, annotated, tri
       </div>
 
       <Section title="Recommended action" badge={annotated ? <NBadge n={6} /> : null}>
-        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+        <div data-tour-target="recommended-action" className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <div className="text-sm font-medium text-slate-900 mb-1">{c.action}</div>
@@ -762,7 +801,7 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
           </div>
         </div>
 
-        <div>
+        <div data-tour-target="open-list">
           <div className="flex items-baseline justify-between mb-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center">Open · ranked by leverage{annotated && <NBadge n={2} />}</div>
             <div className="text-[11px] text-slate-500">{open.length} cluster{open.length !== 1 && 's'}</div>
@@ -821,25 +860,36 @@ function Workbench({ trialDay, annotated, selected, setSelected }: { trialDay: n
 
 function Scorecard({ trialDay, annotated, onNavigateToCluster }: { trialDay: number; annotated: boolean; onNavigateToCluster: (id: string) => void }) {
   const snap = getSnapshot(trialDay);
+  const day7Snap = getSnapshot(7);
   const data = SLOPE.slice(0, trialDay + 1);
   const events = TIMELINE.filter((e) => e.day <= trialDay);
   const monthlyDeflectedDelta = Math.round((snap.monthlyVolume * (snap.deflection - 38)) / 100);
   const annualROI = Math.round(monthlyDeflectedDelta * 12 * snap.costPerTicket);
   const last = data[data.length - 1];
+  const ciTighten = trialDay > 7 && snap.slopeCI > 0 ? day7Snap.slopeCI / snap.slopeCI : null;
+  const [showOnePager, setShowOnePager] = useState(false);
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-5">
+      <div data-tour-target="trajectory-chart" className="col-span-2 rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between mb-3 gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trial trajectory · day {trialDay} of 30</div>
             <div className="flex items-baseline gap-2 mt-1">
-              <div className="text-3xl font-bold text-emerald-700 tabular-nums flex items-baseline gap-1.5">
+              <div className="text-3xl font-bold text-emerald-700 tabular-nums flex items-baseline gap-1.5 flex-wrap">
                 +{snap.slopePerWeek}
                 <span className="text-lg font-semibold text-emerald-700/70">±{snap.slopeCI}</span>
                 <span className="text-base font-medium text-slate-500">pts / wk</span>
                 {annotated && <NBadge n={1} />}
                 <span className="text-base font-medium text-slate-500">deflection</span>
+                {ciTighten && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border text-blue-700 bg-blue-50 border-blue-200 cursor-help"
+                    title={`Day-7 slope (+${day7Snap.slopePerWeek} ±${day7Snap.slopeCI}) was inflated by quick KB and prompt wins. Day-${trialDay} slope reflects the steady-state rate, with a confidence interval ${ciTighten.toFixed(1)}× narrower — the measurement is more reliable, not the progress slowing.`}
+                  >
+                    CI ±{day7Snap.slopeCI} → ±{snap.slopeCI} · {ciTighten.toFixed(1)}× tighter
+                  </span>
+                )}
               </div>
             </div>
             <div className="text-xs text-slate-500 mt-1">Headline is rate of improvement, not level. 80% CI from 7-day rolling regression on the deflection series. Current deflection: {snap.deflection}% · containment: {snap.containment}%.</div>
@@ -881,18 +931,13 @@ function Scorecard({ trialDay, annotated, onNavigateToCluster }: { trialDay: num
           {monthlyDeflectedDelta.toLocaleString()} more conversations deflected per month vs. baseline · ${snap.costPerTicket.toFixed(2)} avg cost per ticket · {snap.monthlyVolume.toLocaleString()} monthly volume.
           {annotated && <NBadge n={6} />}
         </div>
-        <div className="mt-auto pt-4 relative group">
+        <div className="mt-auto pt-4">
           <button
-            disabled
-            aria-disabled="true"
-            title="Coming soon — would generate a one-page ROI summary for the economic buyer"
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-dashed border-slate-300 bg-white/60 text-slate-500 px-3 py-2 rounded-md cursor-not-allowed"
+            onClick={() => setShowOnePager(true)}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold border border-blue-300 bg-white text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50 hover:border-blue-400 transition"
           >
             Export buyer one-pager <ArrowUpRight className="w-4 h-4" />
           </button>
-          <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition text-[11px] font-medium text-white bg-slate-900 px-2 py-1 rounded-md whitespace-nowrap shadow-lg">
-            Coming soon — generates a one-page ROI summary for the buyer
-          </div>
         </div>
       </div>
 
@@ -934,6 +979,164 @@ function Scorecard({ trialDay, annotated, onNavigateToCluster }: { trialDay: num
           ))}
         </div>
       </div>
+      {showOnePager && (
+        <OnePagerModal
+          trialDay={trialDay}
+          snap={snap}
+          day7Snap={day7Snap}
+          data={data}
+          events={events}
+          monthlyDeflectedDelta={monthlyDeflectedDelta}
+          annualROI={annualROI}
+          last={last}
+          ciTighten={ciTighten}
+          onClose={() => setShowOnePager(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================== ONE-PAGER MODAL ============================== */
+
+type Snap = ReturnType<typeof getSnapshot>;
+type SlopePoint = typeof SLOPE[number];
+type TimelineEvent = typeof TIMELINE[number];
+
+function OnePagerModal({
+  trialDay, snap, day7Snap, data, events, monthlyDeflectedDelta, annualROI, last, ciTighten, onClose,
+}: {
+  trialDay: number;
+  snap: Snap;
+  day7Snap: Snap;
+  data: SlopePoint[];
+  events: readonly TimelineEvent[];
+  monthlyDeflectedDelta: number;
+  annualROI: number;
+  last: SlopePoint;
+  ciTighten: number | null;
+  onClose: () => void;
+}) {
+  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const deflectionDelta = (snap.deflection - 38).toFixed(1);
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 overflow-y-auto" onClick={onClose}>
+      <div className="bg-slate-100 rounded-2xl shadow-2xl max-w-3xl w-full my-6" onClick={(e) => e.stopPropagation()}>
+        {/* Modal toolbar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white rounded-t-2xl">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+            <ArrowUpRight className="w-3 h-3" />Buyer one-pager · preview
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition"
+            >
+              Print preview
+            </button>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Document body — styled to look like a printable page */}
+        <div className="bg-white m-5 p-8 rounded-lg shadow-sm border border-slate-200 space-y-6">
+          {/* Header */}
+          <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-md bg-slate-900 grid place-items-center text-white text-sm font-bold">D</div>
+              <div>
+                <div className="font-semibold text-slate-900 text-base">Acme Apparel · Hill-climbing trial</div>
+                <div className="text-xs text-slate-500">Day {trialDay} of 30 · prepared {dateStr}</div>
+              </div>
+            </div>
+            <Pill className="text-slate-700 bg-slate-50 border-slate-200 shrink-0">
+              <Lock className="w-3 h-3" />Definitions locked at trial start
+            </Pill>
+          </div>
+
+          {/* Headline metrics */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Deflection slope</div>
+              <div className="text-2xl font-bold text-emerald-700 tabular-nums mt-1">+{snap.slopePerWeek} <span className="text-base font-semibold text-emerald-700/70">±{snap.slopeCI}</span></div>
+              <div className="text-[10px] text-slate-500 mt-1">pts / wk · 80% CI · 7-day rolling regression</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">Annualized savings</div>
+              <div className="text-2xl font-bold text-blue-900 tabular-nums mt-1">${(annualROI / 1000).toFixed(0)}K<span className="text-base font-semibold text-blue-700/70 ml-0.5"> / yr</span></div>
+              <div className="text-[10px] text-slate-500 mt-1">{monthlyDeflectedDelta.toLocaleString()} more conv. deflected/mo · ${snap.costPerTicket.toFixed(2)} avg cost/ticket</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-700">Deflection level</div>
+              <div className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{snap.deflection}%<span className="text-base font-semibold text-emerald-700 ml-2">+{deflectionDelta}</span></div>
+              <div className="text-[10px] text-slate-500 mt-1">vs. 38% baseline (trial day 0) · containment {snap.containment}%</div>
+            </div>
+          </div>
+
+          {/* Trajectory chart */}
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center justify-between">
+              <span>Trial trajectory</span>
+              {ciTighten && (
+                <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                  CI ±{day7Snap.slopeCI} → ±{snap.slopeCI} · {ciTighten.toFixed(1)}× tighter measurement
+                </span>
+              )}
+            </div>
+            <div className="h-44 -ml-2">
+              <ResponsiveContainer>
+                <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="day" tickFormatter={(d) => `D${d}`} fontSize={10} stroke="#64748b" />
+                  <YAxis fontSize={10} stroke="#64748b" domain={[30, 80]} tickFormatter={(v) => `${v}%`} />
+                  <Line type="monotone" dataKey="deflection"  stroke="#2563eb" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="containment" stroke="#94a3b8" strokeWidth={2}   strokeDasharray="5 4" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex items-center justify-between text-[10px] mt-1 ml-2">
+              <div className="flex gap-3">
+                <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-600" />Deflection (resolved)</span>
+                <span className="flex items-center gap-1"><span className="w-3 border-t-2 border-dashed border-slate-400" />Containment (no handoff)</span>
+              </div>
+              <span className="text-slate-500">CSAT {snap.csat.toFixed(2)} ★ · n={last.csatN}</span>
+            </div>
+          </div>
+
+          {/* Attributed timeline */}
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Attributed improvement timeline</div>
+            <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+              {events.map((e) => (
+                <div key={e.day} className="flex items-start gap-3 px-3 py-2 text-xs">
+                  <div className="w-12 font-semibold text-slate-500 tabular-nums">Day {e.day}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-900 font-medium truncate">{e.action}</div>
+                    <div className="text-[10px] text-slate-500">{e.intent} · {e.owner}{e.clusterId && ` · ${e.name}`}</div>
+                  </div>
+                  <div className="font-semibold tabular-nums shrink-0 text-emerald-700">
+                    {'deflectionLift' in e && e.deflectionLift ? `+${e.deflectionLift} pts deflection` : ''}
+                    {'csatLift' in e && e.csatLift ? `+${e.csatLift} CSAT` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footnotes */}
+          <div className="border-t border-slate-200 pt-3 text-[10px] text-slate-500 leading-relaxed">
+            <div className="font-semibold text-slate-700 mb-1">Method notes</div>
+            <ul className="list-disc list-outside ml-4 space-y-0.5">
+              <li><span className="font-medium text-slate-700">Deflection</span> = no repeat contact within 5 days. <span className="font-medium text-slate-700">Containment</span> = no human handoff during conversation. Both definitions locked jointly with Acme Apparel at trial day 0.</li>
+              <li>Slope is a rolling 7-day OLS regression on the daily deflection series. CI is the 80% interval from the regression standard error.</li>
+              <li>Annualized savings = monthly conversation volume × (current deflection − baseline deflection) × 12 × cost per ticket. Gross savings; AI per-conversation cost not netted.</li>
+              <li>Each timeline lift links to a specific Workbench cluster + the operator action that shipped it. Auditable from the prototype's Workbench tab.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -971,33 +1174,109 @@ function TourCard({ step, onPrev, onNext, onClose }: { step: number; onPrev: () 
   const s = TOUR[step];
   const total = TOUR.length;
   const isLast = step === total - 1;
+
+  // Anchor positioning: place the card next to the targeted element when one
+  // is specified, with a dim overlay highlighting the rest of the page. The
+  // popover will never sit over the area it's describing.
+  type Pos = { top: number; left: number; targetRect: DOMRect | null };
+  const [pos, setPos] = useState<Pos>({ top: 0, left: 0, targetRect: null });
+  const cardW = 380;
+  const cardH = 200;
+  const margin = 16;
+
+  useEffect(() => {
+    const compute = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const fallback: Pos = { top: vh - cardH - 24, left: Math.max(margin, vw / 2 - cardW / 2), targetRect: null };
+      if (!s.target) { setPos(fallback); return; }
+      const el = document.querySelector(s.target) as HTMLElement | null;
+      if (!el) { setPos(fallback); return; }
+      el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      // Re-measure after scroll-into-view kicks in
+      requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect();
+        // Try right of target, then below, then left, then above, then fallback to viewport bottom
+        let top = Math.max(margin, Math.min(r.top, vh - cardH - margin));
+        let left = r.right + margin;
+        if (left + cardW > vw - margin) {
+          // Try below
+          left = Math.max(margin, Math.min(r.left, vw - cardW - margin));
+          top = r.bottom + margin;
+          if (top + cardH > vh - margin) {
+            // Try above
+            top = r.top - cardH - margin;
+            if (top < margin) {
+              // Try left of target
+              top = Math.max(margin, Math.min(r.top, vh - cardH - margin));
+              left = r.left - cardW - margin;
+              if (left < margin) {
+                // Give up — anchor to viewport bottom
+                setPos(fallback);
+                return;
+              }
+            }
+          }
+        }
+        setPos({ top, left, targetRect: r });
+      });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, [step, s.target]);
+
+  const r = pos.targetRect;
+  const ringPad = 6;
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(560px,calc(100vw-2rem))]">
-      <div className="bg-white border border-slate-200 rounded-xl shadow-2xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
-            <Play className="w-3 h-3" />Tour · step {step + 1} of {total}
+    <>
+      {/* Dim overlay with a hole punched out for the targeted element */}
+      <div className="fixed inset-0 z-30 pointer-events-none">
+        {r ? (
+          <div
+            className="absolute rounded-lg transition-all"
+            style={{
+              top: r.top - ringPad,
+              left: r.left - ringPad,
+              width: r.width + ringPad * 2,
+              height: r.height + ringPad * 2,
+              boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.45), 0 0 0 3px rgba(37, 99, 235, 0.7)',
+            }}
+          />
+        ) : (
+          <div className="absolute inset-0" style={{ background: 'rgba(15, 23, 42, 0.45)' }} />
+        )}
+      </div>
+      <div
+        className="fixed z-40 transition-all duration-200"
+        style={{ top: pos.top, left: pos.left, width: cardW }}
+      >
+        <div className="bg-white border border-slate-200 rounded-xl shadow-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 inline-flex items-center gap-1.5">
+              <Play className="w-3 h-3" />Tour · step {step + 1} of {total}
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="font-semibold text-slate-900 text-sm mb-1">{s.title}</div>
-        <p className="text-sm text-slate-600 leading-relaxed mb-3">{s.body}</p>
-        <div className="flex items-center justify-between">
-          <button onClick={onClose} className="text-xs font-medium text-slate-500 hover:text-slate-900 transition">End tour</button>
-          <div className="flex gap-2">
-            <button disabled={step === 0} onClick={onPrev} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
-              <ChevronLeft className="w-3.5 h-3.5" />Previous
-            </button>
-            <button onClick={onNext} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white transition">
-              {isLast ? 'Finish' : 'Next'}<ChevronRight className="w-3.5 h-3.5" />
-            </button>
+          <div className="font-semibold text-slate-900 text-sm mb-1">{s.title}</div>
+          <p className="text-sm text-slate-600 leading-relaxed mb-3">{s.body}</p>
+          <div className="flex items-center justify-between">
+            <button onClick={onClose} className="text-xs font-medium text-slate-500 hover:text-slate-900 transition">End tour</button>
+            <div className="flex gap-2">
+              <button disabled={step === 0} onClick={onPrev} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                <ChevronLeft className="w-3.5 h-3.5" />Previous
+              </button>
+              <button onClick={onNext} className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white transition">
+                {isLast ? 'Finish' : 'Next'}<ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="mt-3 h-0.5 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-slate-900 transition-all" style={{ width: `${((step + 1) / total) * 100}%` }} />
+          <div className="mt-3 h-0.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-slate-900 transition-all" style={{ width: `${((step + 1) / total) * 100}%` }} />
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1069,7 +1348,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <button onClick={() => setAnnotated(!annotated)} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md border transition ${annotated ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <button data-tour-target="annotations-toggle" onClick={() => setAnnotated(!annotated)} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md border transition ${annotated ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               {annotated ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               Annotations {annotated ? 'on' : 'off'}
             </button>
